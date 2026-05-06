@@ -1,0 +1,6 @@
+Django==5.2.13
+scikit-learn
+python-dotenv
+openai
+gunicorn
+whitenoise

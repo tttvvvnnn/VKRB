@@ -1,0 +1,131 @@
+{% extends 'base.html' %}
+
+{% block title %}Вакансии — ВППП{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1 class="h3 mb-1">Вакансии</h1>
+        <p class="text-muted mb-0">
+            Здесь отображаются ваши вакансии и публичные вакансии других пользователей.
+        </p>
+    </div>
+
+    {% if is_recruiter %}
+    <a href="{% url 'vacancy_create' %}" class="btn btn-primary">
+        Создать вакансию
+    </a>
+    {% endif %}
+</div>
+
+{% if not is_recruiter %}
+<div class="alert alert-info">
+    Вы зарегистрированы как соискатель. Вы можете просматривать публичные вакансии и откликаться на них.
+    Создание вакансий доступно только пользователям с ролью рекрутера.
+</div>
+{% endif %}
+
+{% if is_recruiter %}
+<section class="mb-5">
+    <h2 class="h4 mb-3">Мои вакансии</h2>
+
+    {% if my_vacancies %}
+    <div class="row g-3">
+        {% for vacancy in my_vacancies %}
+        <div class="col-md-6">
+            <div class="card h-100 shadow-sm">
+                <div class="card-body">
+                    <h3 class="h5">
+                        <a href="{% url 'vacancy_detail' vacancy.pk %}" class="text-decoration-none">
+                            {{ vacancy.title }}
+                        </a>
+                    </h3>
+
+                    <p class="mb-1"><strong>Компания:</strong> {{ vacancy.company }}</p>
+                    <p class="mb-1"><strong>Город:</strong> {{ vacancy.city|default:"Не указан" }}</p>
+                    <p class="mb-1"><strong>Тип занятости:</strong> {{ vacancy.get_employment_type_display }}</p>
+                    <p class="mb-1"><strong>Требуемый опыт:</strong> {{ vacancy.required_experience_years }} лет</p>
+                    <p class="mb-3"><strong>Видимость:</strong> {{ vacancy.get_visibility_display }}</p>
+
+                    <div class="d-flex gap-2">
+                        <a href="{% url 'vacancy_detail' vacancy.pk %}" class="btn btn-sm btn-outline-primary">
+                            Открыть
+                        </a>
+                        <a href="{% url 'vacancy_update' vacancy.pk %}" class="btn btn-sm btn-outline-secondary">
+                            Редактировать
+                        </a>
+                        <a href="{% url 'vacancy_delete' vacancy.pk %}" class="btn btn-sm btn-outline-danger">
+                            Удалить
+                        </a>
+                    </div>
+                </div>
+
+                <div class="card-footer text-muted small">
+                    Создано: {{ vacancy.created_at|date:"d.m.Y H:i" }}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="alert alert-secondary">
+        У вас пока нет созданных вакансий.
+    </div>
+    {% endif %}
+</section>
+{% endif %}
+
+<section>
+    <h2 class="h4 mb-3">Публичные вакансии</h2>
+
+    {% if public_vacancies %}
+    <div class="row g-3">
+        {% for vacancy in public_vacancies %}
+        <div class="col-md-6">
+            <div class="card h-100 shadow-sm">
+                <div class="card-body">
+                    <h3 class="h5">
+                        <a href="{% url 'vacancy_detail' vacancy.pk %}" class="text-decoration-none">
+                            {{ vacancy.title }}
+                        </a>
+                    </h3>
+
+                    <p class="mb-1"><strong>Компания:</strong> {{ vacancy.company }}</p>
+                    <p class="mb-1"><strong>Город:</strong> {{ vacancy.city|default:"Не указан" }}</p>
+                    <p class="mb-1"><strong>Тип занятости:</strong> {{ vacancy.get_employment_type_display }}</p>
+                    <p class="mb-1"><strong>Требуемый опыт:</strong> {{ vacancy.required_experience_years }} лет</p>
+
+                    <p class="mb-3">
+                        <strong>Зарплата:</strong>
+                        {% if vacancy.salary_from or vacancy.salary_to %}
+                        {% if vacancy.salary_from %}от {{ vacancy.salary_from }}{% endif %}
+                        {% if vacancy.salary_to %} до {{ vacancy.salary_to }}{% endif %}
+                        {% else %}
+                        Не указана
+                        {% endif %}
+                    </p>
+
+                    <div class="d-flex gap-2">
+                        <a href="{% url 'vacancy_detail' vacancy.pk %}" class="btn btn-sm btn-outline-primary">
+                            Открыть
+                        </a>
+                        <a href="{% url 'vacancy_apply' vacancy.pk %}" class="btn btn-sm btn-primary">
+                            Откликнуться
+                        </a>
+                    </div>
+                </div>
+
+                <div class="card-footer text-muted small">
+                    Опубликовано: {{ vacancy.created_at|date:"d.m.Y H:i" }}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="alert alert-info">
+        Публичных вакансий других пользователей пока нет.
+    </div>
+    {% endif %}
+</section>
+{% endblock %}

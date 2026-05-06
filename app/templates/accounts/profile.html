@@ -1,0 +1,21 @@
+{% extends 'base.html' %}
+
+{% block title %}Профиль — ВППП{% endblock %}
+
+{% block content %}
+<div class="card shadow-sm">
+    <div class="card-body">
+        <h1 class="h4 mb-3">Профиль пользователя</h1>
+
+        <p>
+            <strong>Email:</strong>
+            {{ user.email|default:user.username }}
+        </p>
+
+        <p class="text-muted mb-0">
+            В дальнейшем здесь можно будет вывести количество созданных резюме,
+            вакансий и результаты сопоставления.
+        </p>
+    </div>
+</div>
+{% endblock %}

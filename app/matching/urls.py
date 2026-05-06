@@ -1,0 +1,32 @@
+from django.urls import path
+
+from . import views
+
+
+urlpatterns = [
+    path('', views.matching_dashboard_view, name='matching_dashboard'),
+
+    path(
+        'resume/<int:pk>/vacancies/',
+        views.match_vacancies_for_resume_view,
+        name='match_vacancies_for_resume'
+    ),
+
+    path(
+        'vacancy/<int:pk>/resumes/',
+        views.match_resumes_for_vacancy_view,
+        name='match_resumes_for_vacancy'
+    ),
+
+    path(
+        'api/resume/<int:pk>/vacancies/',
+        views.match_vacancies_for_resume_api,
+        name='match_vacancies_for_resume_api'
+    ),
+
+    path(
+        'api/vacancy/<int:pk>/resumes/',
+        views.match_resumes_for_vacancy_api,
+        name='match_resumes_for_vacancy_api'
+    ),
+]

@@ -1,0 +1,132 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ vacancy.title }} — ВППП{% endblock %}
+
+{% block content %}
+<div class="mb-3">
+    <a href="{% url 'vacancy_list' %}" class="btn btn-sm btn-outline-secondary">
+        ← К списку вакансий
+    </a>
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start mb-3">
+            <div>
+                <h1 class="h3 mb-1">{{ vacancy.title }}</h1>
+                <p class="text-muted mb-0">
+                    {{ vacancy.company }}
+                </p>
+            </div>
+
+            <div class="d-flex gap-2">
+                {% if is_owner %}
+                <a href="{% url 'vacancy_update' vacancy.pk %}" class="btn btn-outline-primary">
+                    Редактировать
+                </a>
+                <a href="{% url 'vacancy_delete' vacancy.pk %}" class="btn btn-outline-danger">
+                    Удалить
+                </a>
+                {% else %}
+                <a href="{% url 'vacancy_apply' vacancy.pk %}" class="btn btn-primary">
+                    Откликнуться
+                </a>
+                {% endif %}
+            </div>
+        </div>
+
+        <hr>
+
+        <div class="row mb-3">
+            <div class="col-md-6">
+                <p><strong>Город:</strong> {{ vacancy.city|default:"Не указан" }}</p>
+                <p><strong>Тип занятости:</strong> {{ vacancy.get_employment_type_display }}</p>
+                <p><strong>Требуемый опыт:</strong> {{ vacancy.required_experience_years }} лет</p>
+            </div>
+
+            <div class="col-md-6">
+                <p>
+                    <strong>Зарплата:</strong>
+                    {% if vacancy.salary_from or vacancy.salary_to %}
+                    {% if vacancy.salary_from %}от {{ vacancy.salary_from }}{% endif %}
+                    {% if vacancy.salary_to %} до {{ vacancy.salary_to }}{% endif %}
+                    {% else %}
+                    Не указана
+                    {% endif %}
+                </p>
+                <p><strong>Видимость:</strong> {{ vacancy.get_visibility_display }}</p>
+            </div>
+        </div>
+
+        <h2 class="h5">Требуемые навыки</h2>
+        <p>{{ vacancy.skills|linebreaks }}</p>
+
+        <h2 class="h5">Описание вакансии</h2>
+        <p>{{ vacancy.description|linebreaks }}</p>
+
+        <h2 class="h5">Требования к кандидату</h2>
+        <p>{{ vacancy.requirements|default:"Не указаны"|linebreaks }}</p>
+
+        <h2 class="h5">Условия работы</h2>
+        <p>{{ vacancy.conditions|default:"Не указаны"|linebreaks }}</p>
+    </div>
+
+    <div class="card-footer text-muted small">
+        Создано: {{ vacancy.created_at|date:"d.m.Y H:i" }} |
+        Обновлено: {{ vacancy.updated_at|date:"d.m.Y H:i" }}
+    </div>
+</div>
+{% if is_owner %}
+<div class="card shadow-sm mt-4">
+    <div class="card-body">
+        <h2 class="h4 mb-3">Отклики на вакансию</h2>
+
+        {% if applications %}
+        <div class="list-group">
+            {% for application in applications %}
+            <div class="list-group-item">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                        <h3 class="h6 mb-1">
+                            {{ application.resume.title }}
+                        </h3>
+
+                        <p class="mb-1">
+                            <strong>Соискатель:</strong>
+                            {{ application.applicant.email|default:application.applicant.username }}
+                        </p>
+
+                        <p class="mb-1">
+                            <strong>Статус:</strong>
+                            {{ application.get_status_display }}
+                        </p>
+
+                        <p class="mb-1">
+                            <strong>Дата отклика:</strong>
+                            {{ application.created_at|date:"d.m.Y H:i" }}
+                        </p>
+
+                        {% if application.cover_letter %}
+                        <p class="mb-0">
+                            <strong>Сообщение:</strong>
+                            {{ application.cover_letter }}
+                        </p>
+                        {% endif %}
+                    </div>
+
+                    <a href="{% url 'resume_detail' application.resume.pk %}" class="btn btn-sm btn-outline-primary">
+                        Открыть резюме
+                    </a>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="alert alert-info mb-0">
+            На эту вакансию пока нет откликов.
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,94 @@
+{% extends 'base.html' %}
+
+{% block title %}Релевантные резюме — ВППП{% endblock %}
+
+{% block content %}
+<div class="mb-3">
+    <a href="{% url 'matching_dashboard' %}" class="btn btn-sm btn-outline-secondary">
+        ← К сопоставлению
+    </a>
+</div>
+
+<h1 class="h3 mb-2">Релевантные резюме</h1>
+
+<p class="text-muted mb-4">
+    Вакансия: <strong>{{ vacancy.title }}</strong>
+</p>
+
+{% if results %}
+<div class="list-group">
+    {% for item in results %}
+    <div class="list-group-item">
+        <div class="d-flex justify-content-between align-items-start gap-3">
+            <div class="flex-grow-1">
+                <h2 class="h5 mb-1">
+                    <a href="{% url 'resume_detail' item.resume.pk %}" class="text-decoration-none">
+                        {{ item.resume.title }}
+                    </a>
+                </h2>
+
+                <p class="mb-1">
+                    <strong>Кандидат:</strong> {{ item.resume.full_name }}
+                </p>
+
+                <p class="mb-1">
+                    <strong>Желаемая должность:</strong> {{ item.resume.desired_position }}
+                </p>
+
+                <p class="mb-1">
+                    <strong>Опыт:</strong> {{ item.resume.experience_years }} лет
+                </p>
+
+                <p class="mb-2">
+                    <strong>Оценка релевантности:</strong> {{ item.score_percent }}%
+                </p>
+
+                <div class="progress mb-3" style="height: 24px;">
+                    <div
+                            class="progress-bar"
+                            role="progressbar"
+                            style="width: {{ item.progress_percent }}%;"
+                            aria-valuenow="{{ item.progress_percent }}"
+                            aria-valuemin="0"
+                            aria-valuemax="100"
+                    >
+                        {{ item.score_percent }}%
+                    </div>
+                </div>
+
+                <p class="mb-1">
+                    <strong>Совпавшие навыки:</strong>
+                    {% if item.matched_skills %}
+                    {{ item.matched_skills|join:", " }}
+                    {% else %}
+                    Нет совпадений
+                    {% endif %}
+                </p>
+
+                <p class="mb-1">
+                    <strong>Недостающие навыки:</strong>
+                    {% if item.missing_skills %}
+                    {{ item.missing_skills|join:", " }}
+                    {% else %}
+                    Нет
+                    {% endif %}
+                </p>
+
+                <p class="mb-0">
+                    <strong>Пояснение:</strong> {{ item.explanation }}
+                </p>
+            </div>
+
+            <a href="{% url 'resume_detail' item.resume.pk %}" class="btn btn-sm btn-outline-primary">
+                Открыть резюме
+            </a>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="alert alert-info">
+    Подходящие публичные резюме пока не найдены.
+</div>
+{% endif %}
+{% endblock %}

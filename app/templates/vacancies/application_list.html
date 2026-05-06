@@ -1,0 +1,137 @@
+{% extends 'base.html' %}
+
+{% block title %}Отклики — ВППП{% endblock %}
+
+{% block content %}
+<h1 class="h3 mb-4">Отклики</h1>
+
+<section class="mb-5">
+    <h2 class="h4 mb-3">Мои отправленные отклики</h2>
+
+    {% if my_applications %}
+        <div class="list-group">
+            {% for application in my_applications %}
+                <div class="list-group-item">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <h3 class="h5 mb-1">
+                                <a href="{% url 'vacancy_detail' application.vacancy.pk %}" class="text-decoration-none">
+                                    {{ application.vacancy.title }}
+                                </a>
+                            </h3>
+
+                            <p class="mb-1">
+                                <strong>Компания:</strong>
+                                {{ application.vacancy.company }}
+                            </p>
+
+                            <p class="mb-1">
+                                <strong>Резюме:</strong>
+                                {{ application.resume.title }}
+                            </p>
+
+                            <p class="mb-1">
+                                <strong>Статус:</strong>
+                                {{ application.get_status_display }}
+                            </p>
+
+                            <p class="text-muted mb-0">
+                                Отправлено: {{ application.created_at|date:"d.m.Y H:i" }}
+                            </p>
+                        </div>
+
+                        <a href="{% url 'application_delete' application.pk %}" class="btn btn-sm btn-outline-danger">
+                            Отменить
+                        </a>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="alert alert-info">
+            У вас пока нет отправленных откликов.
+        </div>
+    {% endif %}
+</section>
+
+{% if is_recruiter %}
+    <section>
+        <h2 class="h4 mb-3">Отклики на мои вакансии</h2>
+
+        {% if received_applications %}
+            <div class="list-group">
+                {% for application in received_applications %}
+                    <div class="list-group-item">
+                        <div class="d-flex justify-content-between align-items-start gap-3">
+                            <div>
+                                <h3 class="h5 mb-1">
+                                    {{ application.resume.title }}
+                                </h3>
+
+                                <p class="mb-1">
+                                    <strong>Вакансия:</strong>
+                                    <a href="{% url 'vacancy_detail' application.vacancy.pk %}">
+                                        {{ application.vacancy.title }}
+                                    </a>
+                                </p>
+
+                                <p class="mb-1">
+                                    <strong>Соискатель:</strong>
+                                    {{ application.applicant.email|default:application.applicant.username }}
+                                </p>
+
+                                <p class="mb-1">
+                                    <strong>Статус:</strong>
+                                    {{ application.get_status_display }}
+                                </p>
+
+                                {% if application.cover_letter %}
+                                    <p class="mb-1">
+                                        <strong>Сообщение:</strong>
+                                        {{ application.cover_letter }}
+                                    </p>
+                                {% endif %}
+
+                                <p class="text-muted mb-0">
+                                    Получено: {{ application.created_at|date:"d.m.Y H:i" }}
+                                </p>
+                            </div>
+
+                            <div class="d-flex flex-column gap-2">
+                                <a href="{% url 'resume_detail' application.resume.pk %}" class="btn btn-sm btn-outline-primary">
+                                    Открыть резюме
+                                </a>
+
+                                <form method="post" action="{% url 'application_status_update' application.pk 'viewed' %}">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-sm btn-outline-secondary w-100">
+                                        Просмотрен
+                                    </button>
+                                </form>
+
+                                <form method="post" action="{% url 'application_status_update' application.pk 'accepted' %}">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-sm btn-outline-success w-100">
+                                        Принять
+                                    </button>
+                                </form>
+
+                                <form method="post" action="{% url 'application_status_update' application.pk 'rejected' %}">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-sm btn-outline-danger w-100">
+                                        Отклонить
+                                    </button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <div class="alert alert-info">
+                На ваши вакансии пока нет откликов.
+            </div>
+        {% endif %}
+    </section>
+{% endif %}
+{% endblock %}

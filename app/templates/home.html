@@ -1,0 +1,35 @@
+{% extends 'base.html' %}
+
+{% block title %}Главная — ВППП{% endblock %}
+
+{% block content %}
+<div class="p-5 bg-white rounded shadow-sm">
+    <h1 class="mb-3">Веб-приложение для подбора персонала</h1>
+
+    <p class="lead">
+        Система предназначена для хранения резюме и вакансий,
+        а также автоматического сопоставления кандидатов с требованиями вакансий.
+    </p>
+
+    {% if user.is_authenticated %}
+        <p class="mb-4">
+            Вы вошли как <strong>{{ user.email|default:user.username }}</strong>.
+        </p>
+
+        <div class="d-flex gap-2">
+            <a href="{% url 'resume_list' %}" class="btn btn-primary">Мои резюме</a>
+            <a href="{% url 'vacancy_list' %}" class="btn btn-outline-primary">Мои вакансии</a>
+            <a href="{% url 'matching_dashboard' %}" class="btn btn-outline-secondary">Сопоставление</a>
+        </div>
+    {% else %}
+        <p class="mb-4">
+            Для работы с резюме и вакансиями необходимо зарегистрироваться или войти в систему.
+        </p>
+
+        <div class="d-flex gap-2">
+            <a href="{% url 'register' %}" class="btn btn-primary">Зарегистрироваться</a>
+            <a href="{% url 'login' %}" class="btn btn-outline-primary">Войти</a>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

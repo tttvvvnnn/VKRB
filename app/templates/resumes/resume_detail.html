@@ -1,0 +1,74 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ resume.title }} — ВППП{% endblock %}
+
+{% block content %}
+<div class="mb-3">
+    {% if is_owner %}
+    <a href="{% url 'resume_list' %}" class="btn btn-sm btn-outline-secondary">
+        ← К списку резюме
+    </a>
+    {% else %}
+    <a href="{% url 'application_list' %}" class="btn btn-sm btn-outline-secondary">
+        ← К откликам
+    </a>
+    {% endif %}
+</div>
+
+<div class="card shadow-sm">
+    <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start mb-3">
+            <div>
+                <h1 class="h3 mb-1">{{ resume.title }}</h1>
+                <p class="text-muted mb-0">
+                    {{ resume.full_name }} — {{ resume.desired_position }}
+                </p>
+            </div>
+
+            <div class="d-flex gap-2">
+                {% if is_owner %}
+                <a href="{% url 'resume_update' resume.pk %}" class="btn btn-outline-primary">
+                    Редактировать
+                </a>
+                <a href="{% url 'resume_delete' resume.pk %}" class="btn btn-outline-danger">
+                    Удалить
+                </a>
+                {% endif %}
+            </div>
+        </div>
+
+        <hr>
+
+        <div class="row mb-3">
+            <div class="col-md-6">
+                <p><strong>Город:</strong> {{ resume.city|default:"Не указан" }}</p>
+                <p><strong>Email:</strong> {{ resume.email|default:"Не указан" }}</p>
+                <p><strong>Телефон:</strong> {{ resume.phone|default:"Не указан" }}</p>
+            </div>
+
+            <div class="col-md-6">
+                <p><strong>Опыт:</strong> {{ resume.experience_years }} лет</p>
+                <p><strong>Статус поиска:</strong> {{ resume.get_search_status_display }}</p>
+                <p><strong>Видимость:</strong> {{ resume.get_visibility_display }}</p>
+            </div>
+        </div>
+
+        <h2 class="h5">Навыки</h2>
+        <p>{{ resume.skills|linebreaks }}</p>
+
+        <h2 class="h5">Образование</h2>
+        <p>{{ resume.education|default:"Не указано"|linebreaks }}</p>
+
+        <h2 class="h5">Опыт работы</h2>
+        <p>{{ resume.work_experience|default:"Не указан"|linebreaks }}</p>
+
+        <h2 class="h5">Дополнительная информация</h2>
+        <p>{{ resume.about|default:"Не указана"|linebreaks }}</p>
+    </div>
+
+    <div class="card-footer text-muted small">
+        Создано: {{ resume.created_at|date:"d.m.Y H:i" }} |
+        Обновлено: {{ resume.updated_at|date:"d.m.Y H:i" }}
+    </div>
+</div>
+{% endblock %}

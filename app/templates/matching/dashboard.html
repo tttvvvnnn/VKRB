@@ -1,0 +1,75 @@
+{% extends 'base.html' %}
+
+{% block title %}Сопоставление — ВППП{% endblock %}
+
+{% block content %}
+<h1 class="h3 mb-4">Автоматическое сопоставление</h1>
+
+<div class="row g-4">
+    <div class="col-lg-6">
+        <div class="card shadow-sm h-100">
+            <div class="card-body">
+                <h2 class="h4 mb-3">Подобрать вакансии по резюме</h2>
+
+                <p class="text-muted">
+                    Система сравнит выбранное резюме с публичными вакансиями других пользователей
+                    и отсортирует их по релевантности.
+                </p>
+
+                {% if my_resumes %}
+                    <div class="list-group">
+                        {% for resume in my_resumes %}
+                            <a href="{% url 'match_vacancies_for_resume' resume.pk %}" class="list-group-item list-group-item-action">
+                                <strong>{{ resume.title }}</strong><br>
+                                <span class="text-muted">
+                                    {{ resume.desired_position }} · {{ resume.get_search_status_display }}
+                                </span>
+                            </a>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="alert alert-info mb-0">
+                        Для сопоставления сначала создайте резюме.
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-6">
+        <div class="card shadow-sm h-100">
+            <div class="card-body">
+                <h2 class="h4 mb-3">Подобрать резюме по вакансии</h2>
+
+                <p class="text-muted">
+                    Система сравнит выбранную вакансию с публичными резюме соискателей
+                    и отсортирует кандидатов по релевантности.
+                </p>
+
+                {% if is_recruiter %}
+                    {% if my_vacancies %}
+                        <div class="list-group">
+                            {% for vacancy in my_vacancies %}
+                                <a href="{% url 'match_resumes_for_vacancy' vacancy.pk %}" class="list-group-item list-group-item-action">
+                                    <strong>{{ vacancy.title }}</strong><br>
+                                    <span class="text-muted">
+                                        {{ vacancy.company }} · {{ vacancy.get_visibility_display }}
+                                    </span>
+                                </a>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="alert alert-info mb-0">
+                            Для сопоставления сначала создайте вакансию.
+                        </div>
+                    {% endif %}
+                {% else %}
+                    <div class="alert alert-secondary mb-0">
+                        Подбор резюме по вакансии доступен только пользователям с ролью рекрутера.
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

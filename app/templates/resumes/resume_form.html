@@ -1,0 +1,176 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ title }} — ВППП{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-lg-9">
+        <div class="card shadow-sm">
+            <div class="card-body">
+                <h1 class="h4 mb-4">{{ title }}</h1>
+
+                <form method="post">
+                    {% csrf_token %}
+
+                    {% if form.non_field_errors %}
+                        <div class="alert alert-danger">
+                            {{ form.non_field_errors }}
+                        </div>
+                    {% endif %}
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label" for="{{ form.title.id_for_label }}">
+                                Название резюме
+                            </label>
+                            {{ form.title }}
+                            {% for error in form.title.errors %}
+                                <div class="text-danger small">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label" for="{{ form.full_name.id_for_label }}">
+                                ФИО кандидата
+                            </label>
+                            {{ form.full_name }}
+                            {% for error in form.full_name.errors %}
+                                <div class="text-danger small">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label" for="{{ form.desired_position.id_for_label }}">
+                                Желаемая должность
+                            </label>
+                            {{ form.desired_position }}
+                            {% for error in form.desired_position.errors %}
+                                <div class="text-danger small">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label" for="{{ form.city.id_for_label }}">
+                                Город
+                            </label>
+                            {{ form.city }}
+                            {% for error in form.city.errors %}
+                                <div class="text-danger small">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label" for="{{ form.email.id_for_label }}">
+                                Email
+                            </label>
+                            {{ form.email }}
+                            {% for error in form.email.errors %}
+                                <div class="text-danger small">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label" for="{{ form.phone.id_for_label }}">
+                                Телефон
+                            </label>
+                            {{ form.phone }}
+                            {% for error in form.phone.errors %}
+                                <div class="text-danger small">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label" for="{{ form.experience_years.id_for_label }}">
+                                Опыт работы, лет
+                            </label>
+                            {{ form.experience_years }}
+                            {% for error in form.experience_years.errors %}
+                                <div class="text-danger small">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label" for="{{ form.search_status.id_for_label }}">
+                                Статус поиска
+                            </label>
+                            {{ form.search_status }}
+                            {% for error in form.search_status.errors %}
+                                <div class="text-danger small">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+
+                        <div class="col-md-4 mb-3">
+                            <label class="form-label" for="{{ form.visibility.id_for_label }}">
+                                Видимость
+                            </label>
+                            {{ form.visibility }}
+                            {% for error in form.visibility.errors %}
+                                <div class="text-danger small">{{ error }}</div>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label" for="{{ form.skills.id_for_label }}">
+                            Навыки
+                        </label>
+                        {{ form.skills }}
+                        <div class="form-text">
+                            Укажите навыки через запятую. Например: Python, Django, SQL, Git.
+                        </div>
+                        {% for error in form.skills.errors %}
+                            <div class="text-danger small">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label" for="{{ form.education.id_for_label }}">
+                            Образование
+                        </label>
+                        {{ form.education }}
+                        {% for error in form.education.errors %}
+                            <div class="text-danger small">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label" for="{{ form.work_experience.id_for_label }}">
+                            Опыт работы
+                        </label>
+                        {{ form.work_experience }}
+                        {% for error in form.work_experience.errors %}
+                            <div class="text-danger small">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label" for="{{ form.about.id_for_label }}">
+                            Дополнительная информация
+                        </label>
+                        {{ form.about }}
+                        {% for error in form.about.errors %}
+                            <div class="text-danger small">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">
+                            {{ button_text }}
+                        </button>
+
+                        <a href="{% url 'resume_list' %}" class="btn btn-outline-secondary">
+                            Отмена
+                        </a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

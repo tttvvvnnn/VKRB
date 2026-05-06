@@ -1,0 +1,33 @@
+version: '3.9'
+
+services:
+  web:
+    build: .
+    container_name: django-back
+    command: >
+      sh -c "
+        python manage.py migrate &&
+        python manage.py collectstatic --noinput &&
+        python manage.py runserver 0.0.0.0:8000
+      "
+    volumes:
+      - ./app:/app
+      - static_volume:/static
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+
+  nginx:
+    image: nginx:latest
+    container_name: nginx-front
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - static_volume:/static
+    depends_on:
+      - web
+
+volumes:
+  static_volume:

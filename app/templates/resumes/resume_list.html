@@ -1,0 +1,76 @@
+{% extends 'base.html' %}
+
+{% block title %}Мои резюме — ВППП{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1 class="h3 mb-1">Мои резюме</h1>
+        <p class="text-muted mb-0">
+            Здесь отображаются резюме, созданные текущим пользователем.
+        </p>
+    </div>
+
+    <a href="{% url 'resume_create' %}" class="btn btn-primary">
+        Создать резюме
+    </a>
+</div>
+
+{% if resumes %}
+    <div class="row g-3">
+        {% for resume in resumes %}
+            <div class="col-md-6">
+                <div class="card h-100 shadow-sm">
+                    <div class="card-body">
+                        <h2 class="h5">
+                            <a href="{% url 'resume_detail' resume.pk %}" class="text-decoration-none">
+                                {{ resume.title }}
+                            </a>
+                        </h2>
+
+                        <p class="mb-1">
+                            <strong>Кандидат:</strong> {{ resume.full_name }}
+                        </p>
+
+                        <p class="mb-1">
+                            <strong>Должность:</strong> {{ resume.desired_position }}
+                        </p>
+
+                        <p class="mb-1">
+                            <strong>Опыт:</strong> {{ resume.experience_years }} лет
+                        </p>
+
+                        <p class="mb-1">
+                            <strong>Статус:</strong> {{ resume.get_search_status_display }}
+                        </p>
+
+                        <p class="mb-3">
+                            <strong>Видимость:</strong> {{ resume.get_visibility_display }}
+                        </p>
+
+                        <div class="d-flex gap-2">
+                            <a href="{% url 'resume_detail' resume.pk %}" class="btn btn-sm btn-outline-primary">
+                                Открыть
+                            </a>
+                            <a href="{% url 'resume_update' resume.pk %}" class="btn btn-sm btn-outline-secondary">
+                                Редактировать
+                            </a>
+                            <a href="{% url 'resume_delete' resume.pk %}" class="btn btn-sm btn-outline-danger">
+                                Удалить
+                            </a>
+                        </div>
+                    </div>
+
+                    <div class="card-footer text-muted small">
+                        Создано: {{ resume.created_at|date:"d.m.Y H:i" }}
+                    </div>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+{% else %}
+    <div class="alert alert-info">
+        У вас пока нет созданных резюме.
+    </div>
+{% endif %}
+{% endblock %}
