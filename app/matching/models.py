@@ -26,6 +26,11 @@ class MatchResult(models.Model):
     matched_skills = models.JSONField(default=list, verbose_name='Совпавшие навыки')
     missing_skills = models.JSONField(default=list, verbose_name='Недостающие навыки')
     explanation = models.TextField(verbose_name='Объяснение')
+
+    ai_score = models.FloatField(null=True, blank=True, verbose_name='Балл Groq AI')
+    ai_explanation = models.TextField(blank=True, default='', verbose_name='Пояснение Groq AI')
+    ai_used = models.BooleanField(default=False, verbose_name='Использован Groq AI')
+
     calculated_at = models.DateTimeField(auto_now=True, verbose_name='Дата расчёта')
 
     class Meta:

@@ -10,10 +10,7 @@
 </div>
 
 <h1 class="h3 mb-2">Подходящие вакансии</h1>
-
-<p class="text-muted mb-4">
-    Резюме: <strong>{{ resume.title }}</strong>
-</p>
+<p class="text-muted mb-4">Резюме: <strong>{{ resume.title }}</strong></p>
 
 {% if results %}
 <div class="list-group">
@@ -21,33 +18,27 @@
     <div class="list-group-item">
         <div class="d-flex justify-content-between align-items-start gap-3">
             <div class="flex-grow-1">
-                <h2 class="h5 mb-1">
-                    <a href="{% url 'vacancy_detail' item.vacancy.pk %}" class="text-decoration-none">
-                        {{ item.vacancy.title }}
-                    </a>
-                </h2>
+                <div class="d-flex align-items-center gap-2 mb-1">
+                    <h2 class="h5 mb-0">
+                        <a href="{% url 'vacancy_detail' item.vacancy.pk %}" class="text-decoration-none">
+                            {{ item.vacancy.title }}
+                        </a>
+                    </h2>
+                    {% if item.ai_used %}
+                    <span class="badge bg-primary" title="Оценка выполнена Groq AI (Llama 3.3)">✦ AI</span>
+                    {% endif %}
+                </div>
 
-                <p class="mb-1">
-                    <strong>Компания:</strong> {{ item.vacancy.company }}
-                </p>
+                <p class="mb-1"><strong>Компания:</strong> {{ item.vacancy.company }}</p>
+                <p class="mb-1"><strong>Город:</strong> {{ item.vacancy.city|default:"Не указан" }}</p>
+                <p class="mb-2"><strong>Оценка релевантности:</strong> {{ item.score_percent }}%</p>
 
-                <p class="mb-1">
-                    <strong>Город:</strong> {{ item.vacancy.city|default:"Не указан" }}
-                </p>
-
-                <p class="mb-2">
-                    <strong>Оценка релевантности:</strong> {{ item.score_percent }}%
-                </p>
-
-                <div class="progress mb-3" style="height: 24px;">
-                    <div
-                            class="progress-bar"
-                            role="progressbar"
-                            style="width: {{ item.progress_percent }}%;"
-                            aria-valuenow="{{ item.progress_percent }}"
-                            aria-valuemin="0"
-                            aria-valuemax="100"
-                    >
+                <div class="progress mb-3" style="height: 22px;">
+                    <div class="progress-bar {% if item.progress_percent >= 70 %}bg-success{% elif item.progress_percent >= 40 %}bg-warning{% else %}bg-danger{% endif %}"
+                         role="progressbar"
+                         style="width: {{ item.progress_percent }}%;"
+                         aria-valuenow="{{ item.progress_percent }}"
+                         aria-valuemin="0" aria-valuemax="100">
                         {{ item.score_percent }}%
                     </div>
                 </div>
@@ -55,42 +46,39 @@
                 <p class="mb-1">
                     <strong>Совпавшие навыки:</strong>
                     {% if item.matched_skills %}
-                    {{ item.matched_skills|join:", " }}
+                        {% for skill in item.matched_skills %}
+                        <span class="badge bg-success me-1">{{ skill }}</span>
+                        {% endfor %}
                     {% else %}
-                    Нет совпадений
+                        <span class="text-muted">Нет совпадений</span>
                     {% endif %}
                 </p>
 
-                <p class="mb-1">
+                <p class="mb-2">
                     <strong>Недостающие навыки:</strong>
                     {% if item.missing_skills %}
-                    {{ item.missing_skills|join:", " }}
+                        {% for skill in item.missing_skills %}
+                        <span class="badge bg-danger me-1">{{ skill }}</span>
+                        {% endfor %}
                     {% else %}
-                    Нет
+                        <span class="text-muted">Нет</span>
                     {% endif %}
                 </p>
 
-                <p class="mb-0">
-                    <strong>Пояснение:</strong> {{ item.explanation }}
+                <p class="mb-0 text-muted fst-italic">
+                    {% if item.ai_used %}✦{% endif %} {{ item.explanation }}
                 </p>
             </div>
 
-            <div class="d-flex flex-column gap-2">
-                <a href="{% url 'vacancy_detail' item.vacancy.pk %}" class="btn btn-sm btn-outline-primary">
-                    Открыть
-                </a>
-
-                <a href="{% url 'vacancy_apply' item.vacancy.pk %}" class="btn btn-sm btn-primary">
-                    Откликнуться
-                </a>
+            <div class="d-flex flex-column gap-2 flex-shrink-0">
+                <a href="{% url 'vacancy_detail' item.vacancy.pk %}" class="btn btn-sm btn-outline-primary">Открыть</a>
+                <a href="{% url 'vacancy_apply' item.vacancy.pk %}" class="btn btn-sm btn-primary">Откликнуться</a>
             </div>
         </div>
     </div>
     {% endfor %}
 </div>
 {% else %}
-<div class="alert alert-info">
-    Подходящие публичные вакансии пока не найдены.
-</div>
+<div class="alert alert-info">Подходящие публичные вакансии пока не найдены.</div>
 {% endif %}
 {% endblock %}
