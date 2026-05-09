@@ -3,9 +3,10 @@ from django.contrib.auth.decorators import login_required
 from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 
+from accounts.decorators import recruiter_required
 from accounts.models import Profile
 from resumes.models import Resume
-from .forms import VacancyApplicationForm, VacancyForm
+from .forms import VacancyApplicationForm, VacancyFilterForm, VacancyForm
 from .models import Vacancy, VacancyApplication
 
 
@@ -15,33 +16,67 @@ def get_user_profile(user):
 
 
 def user_is_recruiter(user):
-    profile = get_user_profile(user)
-    return profile.role == Profile.Role.RECRUITER
+    return get_user_profile(user).role == Profile.Role.RECRUITER
 
 
 @login_required
 def vacancy_list_view(request):
-    my_vacancies = Vacancy.objects.filter(owner=request.user)
+    filter_form = VacancyFilterForm(request.GET or None)
+
+    my_vacancies = Vacancy.objects.filter(owner=request.user).prefetch_related('skill_tags')
 
     public_vacancies = Vacancy.objects.filter(
         visibility=Vacancy.Visibility.PUBLIC
     ).exclude(
         owner=request.user
-    )
+    ).prefetch_related('skill_tags')
+
+    if filter_form.is_valid():
+        search = filter_form.cleaned_data.get('search')
+        employment_type = filter_form.cleaned_data.get('employment_type')
+        city = filter_form.cleaned_data.get('city')
+        salary_min = filter_form.cleaned_data.get('salary_min')
+        skill = filter_form.cleaned_data.get('skill')
+
+        if search:
+            public_vacancies = public_vacancies.filter(
+                Q(title__icontains=search) |
+                Q(company__icontains=search) |
+                Q(description__icontains=search)
+            )
+            my_vacancies = my_vacancies.filter(
+                Q(title__icontains=search) |
+                Q(company__icontains=search) |
+                Q(description__icontains=search)
+            )
+
+        if employment_type:
+            public_vacancies = public_vacancies.filter(employment_type=employment_type)
+            my_vacancies = my_vacancies.filter(employment_type=employment_type)
+
+        if city:
+            public_vacancies = public_vacancies.filter(city__icontains=city)
+            my_vacancies = my_vacancies.filter(city__icontains=city)
+
+        if salary_min:
+            public_vacancies = public_vacancies.filter(salary_from__gte=salary_min)
+            my_vacancies = my_vacancies.filter(salary_from__gte=salary_min)
+
+        if skill:
+            public_vacancies = public_vacancies.filter(skill_tags__name__icontains=skill).distinct()
+            my_vacancies = my_vacancies.filter(skill_tags__name__icontains=skill).distinct()
 
     return render(request, 'vacancies/vacancy_list.html', {
         'my_vacancies': my_vacancies,
         'public_vacancies': public_vacancies,
         'is_recruiter': user_is_recruiter(request.user),
+        'filter_form': filter_form,
     })
 
 
 @login_required
+@recruiter_required
 def vacancy_create_view(request):
-    if not user_is_recruiter(request.user):
-        messages.error(request, 'Создавать вакансии может только пользователь с ролью рекрутера.')
-        return redirect('vacancy_list')
-
     if request.method == 'POST':
         form = VacancyForm(request.POST)
 
@@ -49,6 +84,7 @@ def vacancy_create_view(request):
             vacancy = form.save(commit=False)
             vacancy.owner = request.user
             vacancy.save()
+            form.save_m2m()
 
             messages.success(request, 'Вакансия успешно создана.')
             return redirect('vacancy_detail', pk=vacancy.pk)
@@ -67,7 +103,7 @@ def vacancy_detail_view(request, pk):
     vacancy = get_object_or_404(
         Vacancy.objects.filter(
             Q(owner=request.user) | Q(visibility=Vacancy.Visibility.PUBLIC)
-        ),
+        ).prefetch_related('skill_tags'),
         pk=pk
     )
 
@@ -75,10 +111,7 @@ def vacancy_detail_view(request, pk):
 
     applications = None
     if is_owner:
-        applications = vacancy.applications.select_related(
-            'resume',
-            'applicant'
-        )
+        applications = vacancy.applications.select_related('resume', 'applicant')
 
     return render(request, 'vacancies/vacancy_detail.html', {
         'vacancy': vacancy,
@@ -88,16 +121,9 @@ def vacancy_detail_view(request, pk):
 
 
 @login_required
+@recruiter_required
 def vacancy_update_view(request, pk):
-    if not user_is_recruiter(request.user):
-        messages.error(request, 'Редактировать вакансии может только рекрутер.')
-        return redirect('vacancy_list')
-
-    vacancy = get_object_or_404(
-        Vacancy,
-        pk=pk,
-        owner=request.user
-    )
+    vacancy = get_object_or_404(Vacancy, pk=pk, owner=request.user)
 
     if request.method == 'POST':
         form = VacancyForm(request.POST, instance=vacancy)
@@ -118,16 +144,9 @@ def vacancy_update_view(request, pk):
 
 
 @login_required
+@recruiter_required
 def vacancy_delete_view(request, pk):
-    if not user_is_recruiter(request.user):
-        messages.error(request, 'Удалять вакансии может только рекрутер.')
-        return redirect('vacancy_list')
-
-    vacancy = get_object_or_404(
-        Vacancy,
-        pk=pk,
-        owner=request.user
-    )
+    vacancy = get_object_or_404(Vacancy, pk=pk, owner=request.user)
 
     if request.method == 'POST':
         vacancy.delete()
@@ -194,21 +213,14 @@ def vacancy_apply_view(request, pk):
 def application_list_view(request):
     my_applications = VacancyApplication.objects.filter(
         applicant=request.user
-    ).select_related(
-        'vacancy',
-        'resume'
-    )
+    ).select_related('vacancy', 'resume')
 
     received_applications = None
 
     if user_is_recruiter(request.user):
         received_applications = VacancyApplication.objects.filter(
             vacancy__owner=request.user
-        ).select_related(
-            'vacancy',
-            'resume',
-            'applicant'
-        )
+        ).select_related('vacancy', 'resume', 'applicant')
 
     return render(request, 'vacancies/application_list.html', {
         'my_applications': my_applications,

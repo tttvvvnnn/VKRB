@@ -1,3 +1,4 @@
+import re
 from decimal import Decimal
 
 from django.contrib.auth.models import User
@@ -5,8 +6,22 @@ from django.core.management.base import BaseCommand
 from django.db import transaction
 
 from accounts.models import Profile
-from resumes.models import Resume
+from resumes.models import Resume, Skill
 from vacancies.models import Vacancy, VacancyApplication
+
+
+def get_skills(names_str):
+    skills = []
+    for name in re.split(r'[,;\n]+', names_str):
+        name = name.strip()
+        if not name:
+            continue
+        # Ищем без учёта регистра, чтобы не дублировать навыки из seed_skills
+        skill = Skill.objects.filter(name__iexact=name).first()
+        if skill is None:
+            skill = Skill.objects.create(name=name)
+        skills.append(skill)
+    return skills
 
 
 class Command(BaseCommand):
@@ -93,7 +108,7 @@ class Command(BaseCommand):
 
         resumes = {}
 
-        resumes['ivan_python'] = Resume.objects.create(
+        resumes['ivan_python'] = self.create_resume(
             owner=ivan,
             title='Python-разработчик Django',
             full_name='Петров Иван Сергеевич',
@@ -103,7 +118,7 @@ class Command(BaseCommand):
             phone='+7 900 111-22-33',
             experience_years=Decimal('1.5'),
             education='Бакалавриат по направлению информатика и вычислительная техника.',
-            skills='Python, Django, SQL, SQLite, PostgreSQL, REST API, Git, HTML, CSS',
+            skills_str='Python, Django, SQL, SQLite, PostgreSQL, REST API, Git, HTML, CSS',
             work_experience=(
                 'Разработка учебных и коммерческих веб-приложений на Django. '
                 'Создание моделей базы данных, настройка маршрутов, шаблонов, форм и административной панели. '
@@ -114,7 +129,7 @@ class Command(BaseCommand):
             visibility=Resume.Visibility.PUBLIC,
         )
 
-        resumes['anna_frontend'] = Resume.objects.create(
+        resumes['anna_frontend'] = self.create_resume(
             owner=anna,
             title='Frontend-разработчик JavaScript',
             full_name='Смирнова Анна Андреевна',
@@ -124,7 +139,7 @@ class Command(BaseCommand):
             phone='+7 900 222-33-44',
             experience_years=Decimal('2.0'),
             education='Высшее образование, прикладная информатика.',
-            skills='HTML, CSS, JavaScript, Bootstrap, React, Git, Figma, REST API',
+            skills_str='HTML, CSS, JavaScript, Bootstrap, React, Git, Figma, REST API',
             work_experience=(
                 'Верстка адаптивных интерфейсов, разработка клиентской логики на JavaScript, '
                 'работа с REST API и компонентным подходом.'
@@ -134,7 +149,7 @@ class Command(BaseCommand):
             visibility=Resume.Visibility.PUBLIC,
         )
 
-        resumes['dmitry_qa'] = Resume.objects.create(
+        resumes['dmitry_qa'] = self.create_resume(
             owner=dmitry,
             title='Тестировщик ПО',
             full_name='Соколов Дмитрий Павлович',
@@ -144,7 +159,7 @@ class Command(BaseCommand):
             phone='+7 900 333-44-55',
             experience_years=Decimal('1.0'),
             education='Среднее профессиональное образование, информационные системы.',
-            skills='Manual Testing, Test Cases, Bug Reports, SQL, Postman, Jira, Git',
+            skills_str='Manual Testing, Test Cases, Bug Reports, SQL, Postman, Jira, Git',
             work_experience=(
                 'Функциональное тестирование веб-приложений, составление тест-кейсов, '
                 'оформление баг-репортов, проверка API через Postman.'
@@ -154,7 +169,7 @@ class Command(BaseCommand):
             visibility=Resume.Visibility.PUBLIC,
         )
 
-        resumes['maria_data'] = Resume.objects.create(
+        resumes['maria_data'] = self.create_resume(
             owner=maria,
             title='Аналитик данных',
             full_name='Кузнецова Мария Игоревна',
@@ -164,7 +179,7 @@ class Command(BaseCommand):
             phone='+7 900 444-55-66',
             experience_years=Decimal('2.5'),
             education='Высшее образование, бизнес-информатика.',
-            skills='Python, SQL, Pandas, Excel, Power BI, Data Analysis, Statistics',
+            skills_str='Python, SQL, Pandas, Excel, Power BI, Data Analysis, Statistics',
             work_experience=(
                 'Подготовка отчетов, анализ данных, построение дашбордов, очистка данных с помощью Python и Pandas.'
             ),
@@ -173,7 +188,7 @@ class Command(BaseCommand):
             visibility=Resume.Visibility.PUBLIC,
         )
 
-        resumes['sergey_devops'] = Resume.objects.create(
+        resumes['sergey_devops'] = self.create_resume(
             owner=sergey,
             title='Junior DevOps инженер',
             full_name='Волков Сергей Николаевич',
@@ -183,7 +198,7 @@ class Command(BaseCommand):
             phone='+7 900 555-66-77',
             experience_years=Decimal('1.0'),
             education='Бакалавриат, программная инженерия.',
-            skills='Linux, Docker, Docker Compose, Git, CI/CD, Nginx, Bash, Python',
+            skills_str='Linux, Docker, Docker Compose, Git, CI/CD, Nginx, Bash, Python',
             work_experience=(
                 'Настройка контейнеров Docker, запуск веб-приложений, базовая настройка Nginx, '
                 'автоматизация задач с помощью Bash.'
@@ -193,7 +208,7 @@ class Command(BaseCommand):
             visibility=Resume.Visibility.PUBLIC,
         )
 
-        resumes['elena_hidden'] = Resume.objects.create(
+        resumes['elena_hidden'] = self.create_resume(
             owner=elena,
             title='HR-специалист',
             full_name='Орлова Елена Максимовна',
@@ -203,7 +218,7 @@ class Command(BaseCommand):
             phone='+7 900 666-77-88',
             experience_years=Decimal('3.0'),
             education='Высшее образование, управление персоналом.',
-            skills='Recruitment, HR, Interview, Communication, Excel',
+            skills_str='Recruitment, HR, Interview, Communication, Excel',
             work_experience='Подбор персонала, проведение интервью, ведение базы кандидатов.',
             about='Резюме скрыто и не должно попадать в публичный подбор.',
             search_status=Resume.SearchStatus.NOT_LOOKING,
@@ -212,7 +227,7 @@ class Command(BaseCommand):
 
         vacancies = {}
 
-        vacancies['python_junior'] = Vacancy.objects.create(
+        vacancies['python_junior'] = self.create_vacancy(
             owner=recruiter_it,
             title='Junior Python Developer',
             company='TechStaff Solutions',
@@ -221,7 +236,7 @@ class Command(BaseCommand):
             required_experience_years=Decimal('1.0'),
             salary_from=80000,
             salary_to=130000,
-            skills='Python, Django, SQL, REST API, Git, HTML, CSS',
+            skills_str='Python, Django, SQL, REST API, Git, HTML, CSS',
             description=(
                 'Требуется junior backend-разработчик для участия в разработке веб-приложений '
                 'на Django и поддержки существующих сервисов.'
@@ -234,7 +249,7 @@ class Command(BaseCommand):
             visibility=Vacancy.Visibility.PUBLIC,
         )
 
-        vacancies['frontend'] = Vacancy.objects.create(
+        vacancies['frontend'] = self.create_vacancy(
             owner=recruiter_it,
             title='Frontend Developer',
             company='WebInterface Lab',
@@ -243,14 +258,14 @@ class Command(BaseCommand):
             required_experience_years=Decimal('1.5'),
             salary_from=90000,
             salary_to=150000,
-            skills='HTML, CSS, JavaScript, React, Bootstrap, Git, REST API',
+            skills_str='HTML, CSS, JavaScript, React, Bootstrap, Git, REST API',
             description='Разработка интерфейсов для веб-приложений и внутренних корпоративных систем.',
             requirements='Опыт адаптивной верстки, знание JavaScript, понимание работы REST API.',
             conditions='Гибкий график, возможность частично удалённой работы.',
             visibility=Vacancy.Visibility.PUBLIC,
         )
 
-        vacancies['qa'] = Vacancy.objects.create(
+        vacancies['qa'] = self.create_vacancy(
             owner=recruiter_hr,
             title='QA Engineer',
             company='QualityPoint',
@@ -259,14 +274,14 @@ class Command(BaseCommand):
             required_experience_years=Decimal('1.0'),
             salary_from=70000,
             salary_to=110000,
-            skills='Manual Testing, Test Cases, Bug Reports, SQL, Postman, Jira',
+            skills_str='Manual Testing, Test Cases, Bug Reports, SQL, Postman, Jira',
             description='Тестирование веб-приложений, проверка пользовательских сценариев и API.',
             requirements='Знание техник тест-дизайна, опыт оформления баг-репортов, базовый SQL.',
             conditions='Официальное оформление, обучение автоматизации тестирования.',
             visibility=Vacancy.Visibility.PUBLIC,
         )
 
-        vacancies['data_analyst'] = Vacancy.objects.create(
+        vacancies['data_analyst'] = self.create_vacancy(
             owner=recruiter_hr,
             title='Data Analyst',
             company='DataVision',
@@ -275,14 +290,14 @@ class Command(BaseCommand):
             required_experience_years=Decimal('2.0'),
             salary_from=100000,
             salary_to=160000,
-            skills='Python, SQL, Pandas, Excel, Power BI, Data Analysis',
+            skills_str='Python, SQL, Pandas, Excel, Power BI, Data Analysis',
             description='Анализ данных, подготовка отчетности, построение дашбордов и поиск закономерностей.',
             requirements='Опыт SQL, Python/Pandas, понимание статистики, умение визуализировать данные.',
             conditions='Гибридный формат, профессиональное развитие, работа с большими массивами данных.',
             visibility=Vacancy.Visibility.PUBLIC,
         )
 
-        vacancies['devops'] = Vacancy.objects.create(
+        vacancies['devops'] = self.create_vacancy(
             owner=recruiter_it,
             title='Junior DevOps Engineer',
             company='CloudDeploy',
@@ -291,14 +306,14 @@ class Command(BaseCommand):
             required_experience_years=Decimal('1.0'),
             salary_from=90000,
             salary_to=140000,
-            skills='Linux, Docker, Docker Compose, Git, CI/CD, Nginx, Bash',
+            skills_str='Linux, Docker, Docker Compose, Git, CI/CD, Nginx, Bash',
             description='Поддержка инфраструктуры веб-приложений, контейнеризация и настройка окружений.',
             requirements='Базовые знания Linux, Docker, Git, понимание принципов CI/CD.',
             conditions='Работа в команде разработки, обучение, возможность роста до Middle DevOps.',
             visibility=Vacancy.Visibility.PUBLIC,
         )
 
-        vacancies['hidden_python'] = Vacancy.objects.create(
+        vacancies['hidden_python'] = self.create_vacancy(
             owner=recruiter_it,
             title='Middle Python Developer — скрытая вакансия',
             company='Internal Project',
@@ -307,7 +322,7 @@ class Command(BaseCommand):
             required_experience_years=Decimal('3.0'),
             salary_from=180000,
             salary_to=250000,
-            skills='Python, Django, PostgreSQL, Redis, Celery, Docker',
+            skills_str='Python, Django, PostgreSQL, Redis, Celery, Docker',
             description='Скрытая тестовая вакансия, не должна отображаться другим пользователям.',
             requirements='Опыт промышленной разработки от 3 лет.',
             conditions='Внутренний проект.',
@@ -339,7 +354,6 @@ class Command(BaseCommand):
         )
 
         self.stdout.write(self.style.SUCCESS('Демонстрационные данные успешно созданы.'))
-
         self.stdout.write('')
         self.stdout.write('Тестовые пользователи:')
         self.stdout.write('Рекрутер 1: recruiter.it@example.com / DemoPassword123')
@@ -358,9 +372,17 @@ class Command(BaseCommand):
             first_name=first_name,
             last_name=last_name,
         )
-
         profile, _ = Profile.objects.get_or_create(user=user)
         profile.role = role
         profile.save()
-
         return user
+
+    def create_resume(self, owner, skills_str, **kwargs):
+        resume = Resume.objects.create(owner=owner, **kwargs)
+        resume.skill_tags.set(get_skills(skills_str))
+        return resume
+
+    def create_vacancy(self, owner, skills_str, **kwargs):
+        vacancy = Vacancy.objects.create(owner=owner, **kwargs)
+        vacancy.skill_tags.set(get_skills(skills_str))
+        return vacancy

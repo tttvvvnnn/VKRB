@@ -27,12 +27,8 @@
 
             <div class="d-flex gap-2">
                 {% if is_owner %}
-                <a href="{% url 'resume_update' resume.pk %}" class="btn btn-outline-primary">
-                    Редактировать
-                </a>
-                <a href="{% url 'resume_delete' resume.pk %}" class="btn btn-outline-danger">
-                    Удалить
-                </a>
+                <a href="{% url 'resume_update' resume.pk %}" class="btn btn-outline-primary">Редактировать</a>
+                <a href="{% url 'resume_delete' resume.pk %}" class="btn btn-outline-danger">Удалить</a>
                 {% endif %}
             </div>
         </div>
@@ -54,7 +50,13 @@
         </div>
 
         <h2 class="h5">Навыки</h2>
-        <p>{{ resume.skills|linebreaks }}</p>
+        <div class="mb-3">
+            {% for skill in resume.skill_tags.all %}
+            <span class="badge bg-primary me-1 mb-1">{{ skill.name }}</span>
+            {% empty %}
+            <span class="text-muted">Не указаны</span>
+            {% endfor %}
+        </div>
 
         <h2 class="h5">Образование</h2>
         <p>{{ resume.education|default:"Не указано"|linebreaks }}</p>

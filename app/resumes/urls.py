@@ -5,6 +5,7 @@ from . import views
 
 urlpatterns = [
     path('', views.resume_list_view, name='resume_list'),
+    path('browse/', views.resume_browse_view, name='resume_browse'),
     path('create/', views.resume_create_view, name='resume_create'),
     path('<int:pk>/', views.resume_detail_view, name='resume_detail'),
     path('<int:pk>/edit/', views.resume_update_view, name='resume_update'),

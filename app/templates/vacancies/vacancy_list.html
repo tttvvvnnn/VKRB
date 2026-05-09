@@ -25,6 +25,41 @@
 </div>
 {% endif %}
 
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-md-3">
+                {{ filter_form.search.label_tag }}
+                {{ filter_form.search }}
+            </div>
+            <div class="col-md-2">
+                {{ filter_form.employment_type.label_tag }}
+                {{ filter_form.employment_type }}
+            </div>
+            <div class="col-md-2">
+                {{ filter_form.city.label_tag }}
+                {{ filter_form.city }}
+            </div>
+            <div class="col-md-2">
+                {{ filter_form.salary_min.label_tag }}
+                {{ filter_form.salary_min }}
+            </div>
+            <div class="col-md-2">
+                {{ filter_form.skill.label_tag }}
+                {{ filter_form.skill }}
+            </div>
+            <div class="col-md-1 d-flex gap-1">
+                <button type="submit" class="btn btn-primary w-100">Найти</button>
+            </div>
+        </form>
+        {% if request.GET %}
+        <div class="mt-2">
+            <a href="{% url 'vacancy_list' %}" class="text-muted small">Сбросить фильтры</a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
 {% if is_recruiter %}
 <section class="mb-5">
     <h2 class="h4 mb-3">Мои вакансии</h2>
@@ -45,18 +80,18 @@
                     <p class="mb-1"><strong>Город:</strong> {{ vacancy.city|default:"Не указан" }}</p>
                     <p class="mb-1"><strong>Тип занятости:</strong> {{ vacancy.get_employment_type_display }}</p>
                     <p class="mb-1"><strong>Требуемый опыт:</strong> {{ vacancy.required_experience_years }} лет</p>
-                    <p class="mb-3"><strong>Видимость:</strong> {{ vacancy.get_visibility_display }}</p>
+                    <p class="mb-2"><strong>Видимость:</strong> {{ vacancy.get_visibility_display }}</p>
+
+                    <div class="mb-3">
+                        {% for skill in vacancy.skill_tags.all %}
+                        <span class="badge bg-secondary me-1 mb-1">{{ skill.name }}</span>
+                        {% endfor %}
+                    </div>
 
                     <div class="d-flex gap-2">
-                        <a href="{% url 'vacancy_detail' vacancy.pk %}" class="btn btn-sm btn-outline-primary">
-                            Открыть
-                        </a>
-                        <a href="{% url 'vacancy_update' vacancy.pk %}" class="btn btn-sm btn-outline-secondary">
-                            Редактировать
-                        </a>
-                        <a href="{% url 'vacancy_delete' vacancy.pk %}" class="btn btn-sm btn-outline-danger">
-                            Удалить
-                        </a>
+                        <a href="{% url 'vacancy_detail' vacancy.pk %}" class="btn btn-sm btn-outline-primary">Открыть</a>
+                        <a href="{% url 'vacancy_update' vacancy.pk %}" class="btn btn-sm btn-outline-secondary">Редактировать</a>
+                        <a href="{% url 'vacancy_delete' vacancy.pk %}" class="btn btn-sm btn-outline-danger">Удалить</a>
                     </div>
                 </div>
 
@@ -95,7 +130,7 @@
                     <p class="mb-1"><strong>Тип занятости:</strong> {{ vacancy.get_employment_type_display }}</p>
                     <p class="mb-1"><strong>Требуемый опыт:</strong> {{ vacancy.required_experience_years }} лет</p>
 
-                    <p class="mb-3">
+                    <p class="mb-2">
                         <strong>Зарплата:</strong>
                         {% if vacancy.salary_from or vacancy.salary_to %}
                         {% if vacancy.salary_from %}от {{ vacancy.salary_from }}{% endif %}
@@ -105,13 +140,15 @@
                         {% endif %}
                     </p>
 
+                    <div class="mb-3">
+                        {% for skill in vacancy.skill_tags.all %}
+                        <span class="badge bg-secondary me-1 mb-1">{{ skill.name }}</span>
+                        {% endfor %}
+                    </div>
+
                     <div class="d-flex gap-2">
-                        <a href="{% url 'vacancy_detail' vacancy.pk %}" class="btn btn-sm btn-outline-primary">
-                            Открыть
-                        </a>
-                        <a href="{% url 'vacancy_apply' vacancy.pk %}" class="btn btn-sm btn-primary">
-                            Откликнуться
-                        </a>
+                        <a href="{% url 'vacancy_detail' vacancy.pk %}" class="btn btn-sm btn-outline-primary">Открыть</a>
+                        <a href="{% url 'vacancy_apply' vacancy.pk %}" class="btn btn-sm btn-primary">Откликнуться</a>
                     </div>
                 </div>
 
@@ -124,7 +161,7 @@
     </div>
     {% else %}
     <div class="alert alert-info">
-        Публичных вакансий других пользователей пока нет.
+        Публичных вакансий не найдено.
     </div>
     {% endif %}
 </section>

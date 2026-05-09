@@ -26,10 +26,11 @@ class VacancyAdmin(admin.ModelAdmin):
     search_fields = (
         'title',
         'company',
-        'skills',
         'description',
         'requirements',
     )
+
+    filter_horizontal = ('skill_tags',)
 
     readonly_fields = (
         'created_at',

@@ -1,0 +1,87 @@
+{% extends 'base.html' %}
+
+{% block title %}Все резюме — ВППП{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1 class="h3 mb-1">Все резюме</h1>
+        <p class="text-muted mb-0">
+            Публичные резюме кандидатов, доступные для просмотра.
+        </p>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="get" class="row g-2 align-items-end">
+            <div class="col-md-3">
+                {{ filter_form.search.label_tag }}
+                {{ filter_form.search }}
+            </div>
+            <div class="col-md-2">
+                {{ filter_form.city.label_tag }}
+                {{ filter_form.city }}
+            </div>
+            <div class="col-md-3">
+                {{ filter_form.search_status.label_tag }}
+                {{ filter_form.search_status }}
+            </div>
+            <div class="col-md-2">
+                {{ filter_form.skill.label_tag }}
+                {{ filter_form.skill }}
+            </div>
+            <div class="col-md-2 d-flex gap-1">
+                <button type="submit" class="btn btn-primary w-100">Найти</button>
+            </div>
+        </form>
+        {% if request.GET %}
+        <div class="mt-2">
+            <a href="{% url 'resume_browse' %}" class="text-muted small">Сбросить фильтры</a>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+{% if resumes %}
+<div class="row g-3">
+    {% for resume in resumes %}
+    <div class="col-md-6">
+        <div class="card h-100 shadow-sm">
+            <div class="card-body">
+                <h2 class="h5">
+                    <a href="{% url 'resume_detail' resume.pk %}" class="text-decoration-none">
+                        {{ resume.title }}
+                    </a>
+                </h2>
+
+                <p class="mb-1"><strong>Кандидат:</strong> {{ resume.full_name }}</p>
+                <p class="mb-1"><strong>Должность:</strong> {{ resume.desired_position }}</p>
+                <p class="mb-1"><strong>Город:</strong> {{ resume.city|default:"Не указан" }}</p>
+                <p class="mb-1"><strong>Опыт:</strong> {{ resume.experience_years }} лет</p>
+                <p class="mb-2"><strong>Статус:</strong> {{ resume.get_search_status_display }}</p>
+
+                <div class="mb-3">
+                    {% for skill in resume.skill_tags.all %}
+                    <span class="badge bg-secondary me-1 mb-1">{{ skill.name }}</span>
+                    {% endfor %}
+                </div>
+
+                <a href="{% url 'resume_detail' resume.pk %}" class="btn btn-sm btn-outline-primary">
+                    Открыть резюме
+                </a>
+            </div>
+
+            <div class="card-footer text-muted small">
+                Создано: {{ resume.created_at|date:"d.m.Y H:i" }}
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% else %}
+<div class="alert alert-info">
+    Публичных резюме не найдено.
+</div>
+{% endif %}
+{% endblock %}

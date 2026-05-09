@@ -1,6 +1,12 @@
 from django.contrib import admin
 
-from .models import Resume
+from .models import Resume, Skill
+
+
+@admin.register(Skill)
+class SkillAdmin(admin.ModelAdmin):
+    list_display = ('name',)
+    search_fields = ('name',)
 
 
 @admin.register(Resume)
@@ -28,9 +34,10 @@ class ResumeAdmin(admin.ModelAdmin):
         'title',
         'full_name',
         'desired_position',
-        'skills',
         'work_experience',
     )
+
+    filter_horizontal = ('skill_tags',)
 
     readonly_fields = (
         'created_at',

@@ -1,9 +1,16 @@
 from django import forms
 
-from .models import Resume
+from resumes.models import Resume, Skill
 
 
 class ResumeForm(forms.ModelForm):
+    skill_tags = forms.ModelMultipleChoiceField(
+        queryset=Skill.objects.all().order_by('name'),
+        widget=forms.SelectMultiple(attrs={'class': 'tom-select'}),
+        required=False,
+        label='Навыки',
+    )
+
     class Meta:
         model = Resume
         fields = [
@@ -15,7 +22,7 @@ class ResumeForm(forms.ModelForm):
             'phone',
             'experience_years',
             'education',
-            'skills',
+            'skill_tags',
             'work_experience',
             'about',
             'search_status',
@@ -57,11 +64,6 @@ class ResumeForm(forms.ModelForm):
                 'rows': 3,
                 'placeholder': 'Опишите образование'
             }),
-            'skills': forms.Textarea(attrs={
-                'class': 'form-control',
-                'rows': 3,
-                'placeholder': 'Например: Python, Django, SQL, Git'
-            }),
             'work_experience': forms.Textarea(attrs={
                 'class': 'form-control',
                 'rows': 5,
@@ -72,10 +74,39 @@ class ResumeForm(forms.ModelForm):
                 'rows': 4,
                 'placeholder': 'Дополнительная информация о кандидате'
             }),
-            'search_status': forms.Select(attrs={
-                'class': 'form-select'
-            }),
-            'visibility': forms.Select(attrs={
-                'class': 'form-select'
-            }),
+            'search_status': forms.Select(attrs={'class': 'form-select'}),
+            'visibility': forms.Select(attrs={'class': 'form-select'}),
         }
+
+
+class ResumeFilterForm(forms.Form):
+    search = forms.CharField(
+        required=False,
+        label='Поиск',
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Должность, навык...'
+        })
+    )
+    city = forms.CharField(
+        required=False,
+        label='Город',
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Город'
+        })
+    )
+    search_status = forms.ChoiceField(
+        required=False,
+        label='Статус поиска',
+        choices=[('', 'Любой')] + Resume.SearchStatus.choices,
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+    skill = forms.CharField(
+        required=False,
+        label='Навык',
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Например: Python'
+        })
+    )

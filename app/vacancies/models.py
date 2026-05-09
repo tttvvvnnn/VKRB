@@ -1,7 +1,7 @@
 from django.conf import settings
 from django.db import models
 
-from resumes.models import Resume
+from resumes.models import Resume, Skill
 
 
 class Vacancy(models.Model):
@@ -65,9 +65,11 @@ class Vacancy(models.Model):
         verbose_name='Зарплата до'
     )
 
-    skills = models.TextField(
-        verbose_name='Требуемые навыки',
-        help_text='Укажите ключевые навыки через запятую'
+    skill_tags = models.ManyToManyField(
+        Skill,
+        blank=True,
+        related_name='vacancies',
+        verbose_name='Требуемые навыки'
     )
 
     description = models.TextField(

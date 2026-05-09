@@ -1,5 +1,3 @@
-import re
-
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
@@ -7,28 +5,19 @@ from sklearn.metrics.pairwise import cosine_similarity
 def normalize_text(value):
     if not value:
         return ''
-
     return str(value).lower().strip()
 
 
-def split_skills(value):
-    if not value:
-        return set()
-
-    parts = re.split(r'[,;\n]+', value.lower())
-
-    return {
-        item.strip()
-        for item in parts
-        if item.strip()
-    }
+def get_skill_names(obj):
+    return {s.name.lower() for s in obj.skill_tags.all()}
 
 
 def build_resume_text(resume):
+    skills_text = ' '.join(s.name for s in resume.skill_tags.all())
     return ' '.join([
         normalize_text(resume.title),
         normalize_text(resume.desired_position),
-        normalize_text(resume.skills),
+        normalize_text(skills_text),
         normalize_text(resume.education),
         normalize_text(resume.work_experience),
         normalize_text(resume.about),
@@ -36,9 +25,10 @@ def build_resume_text(resume):
 
 
 def build_vacancy_text(vacancy):
+    skills_text = ' '.join(s.name for s in vacancy.skill_tags.all())
     return ' '.join([
         normalize_text(vacancy.title),
-        normalize_text(vacancy.skills),
+        normalize_text(skills_text),
         normalize_text(vacancy.description),
         normalize_text(vacancy.requirements),
         normalize_text(vacancy.conditions),
@@ -62,8 +52,8 @@ def calculate_text_similarity(resume, vacancy):
 
 
 def calculate_skill_score(resume, vacancy):
-    resume_skills = split_skills(resume.skills)
-    vacancy_skills = split_skills(vacancy.skills)
+    resume_skills = get_skill_names(resume)
+    vacancy_skills = get_skill_names(vacancy)
 
     if not vacancy_skills:
         return {
@@ -74,7 +64,6 @@ def calculate_skill_score(resume, vacancy):
 
     matched_skills = sorted(resume_skills.intersection(vacancy_skills))
     missing_skills = sorted(vacancy_skills.difference(resume_skills))
-
     score = len(matched_skills) / len(vacancy_skills)
 
     return {
@@ -110,7 +99,7 @@ def calculate_city_score(resume, vacancy):
     return 0.0
 
 
-def calculate_match(resume, vacancy):
+def _compute_match(resume, vacancy):
     skill_data = calculate_skill_score(resume, vacancy)
     text_score = calculate_text_similarity(resume, vacancy)
     experience_score = calculate_experience_score(resume, vacancy)
@@ -124,14 +113,12 @@ def calculate_match(resume, vacancy):
     )
 
     score_percent = round(final_score * 100, 2)
-    progress_percent = max(0, min(100, round(score_percent)))
-
     explanation = build_explanation(
         score_percent=score_percent,
         skill_data=skill_data,
         text_score=text_score,
         experience_score=experience_score,
-        city_score=city_score
+        city_score=city_score,
     )
 
     return {
@@ -144,8 +131,50 @@ def calculate_match(resume, vacancy):
         'matched_skills': skill_data['matched_skills'],
         'missing_skills': skill_data['missing_skills'],
         'explanation': explanation,
-        'progress_percent': progress_percent,
+        'progress_percent': max(0, min(100, round(score_percent))),
     }
+
+
+def calculate_match(resume, vacancy):
+    from matching.models import MatchResult
+
+    try:
+        cached = MatchResult.objects.get(resume=resume, vacancy=vacancy)
+        if cached.calculated_at >= resume.updated_at and cached.calculated_at >= vacancy.updated_at:
+            return {
+                'score': cached.score,
+                'score_percent': cached.score_percent,
+                'skill_score_percent': cached.skill_score_percent,
+                'text_score_percent': cached.text_score_percent,
+                'experience_score_percent': cached.experience_score_percent,
+                'city_score_percent': cached.city_score_percent,
+                'matched_skills': cached.matched_skills,
+                'missing_skills': cached.missing_skills,
+                'explanation': cached.explanation,
+                'progress_percent': max(0, min(100, round(cached.score_percent))),
+            }
+    except MatchResult.DoesNotExist:
+        pass
+
+    result = _compute_match(resume, vacancy)
+
+    MatchResult.objects.update_or_create(
+        resume=resume,
+        vacancy=vacancy,
+        defaults={
+            'score': result['score'],
+            'score_percent': result['score_percent'],
+            'skill_score_percent': result['skill_score_percent'],
+            'text_score_percent': result['text_score_percent'],
+            'experience_score_percent': result['experience_score_percent'],
+            'city_score_percent': result['city_score_percent'],
+            'matched_skills': result['matched_skills'],
+            'missing_skills': result['missing_skills'],
+            'explanation': result['explanation'],
+        }
+    )
+
+    return result
 
 
 def build_explanation(score_percent, skill_data, text_score, experience_score, city_score):
@@ -191,21 +220,17 @@ def build_explanation(score_percent, skill_data, text_score, experience_score, c
 
 def rank_vacancies_for_resume(resume, vacancies):
     results = []
-
     for vacancy in vacancies:
         match_data = calculate_match(resume, vacancy)
         match_data['vacancy'] = vacancy
         results.append(match_data)
-
     return sorted(results, key=lambda item: item['score'], reverse=True)
 
 
 def rank_resumes_for_vacancy(vacancy, resumes):
     results = []
-
     for resume in resumes:
         match_data = calculate_match(resume, vacancy)
         match_data['resume'] = resume
         results.append(match_data)
-
     return sorted(results, key=lambda item: item['score'], reverse=True)

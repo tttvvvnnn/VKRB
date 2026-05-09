@@ -2,6 +2,22 @@ from django.conf import settings
 from django.db import models
 
 
+class Skill(models.Model):
+    name = models.CharField(
+        max_length=100,
+        unique=True,
+        verbose_name='Навык'
+    )
+
+    class Meta:
+        verbose_name = 'Навык'
+        verbose_name_plural = 'Навыки'
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
+
+
 class Resume(models.Model):
     class Visibility(models.TextChoices):
         PUBLIC = 'public', 'Видно всем'
@@ -64,9 +80,11 @@ class Resume(models.Model):
         verbose_name='Образование'
     )
 
-    skills = models.TextField(
-        verbose_name='Навыки',
-        help_text='Укажите ключевые навыки через запятую'
+    skill_tags = models.ManyToManyField(
+        Skill,
+        blank=True,
+        related_name='resumes',
+        verbose_name='Навыки'
     )
 
     work_experience = models.TextField(
