@@ -18,6 +18,9 @@ urlpatterns = [
         name='application_delete'
     ),
 
+    path('import/hh/', views.hh_import_view, name='hh_import'),
+    path('import/trudvsem/', views.trudvsem_import_view, name='trudvsem_import'),
+
     path('<int:pk>/', views.vacancy_detail_view, name='vacancy_detail'),
     path('<int:pk>/edit/', views.vacancy_update_view, name='vacancy_update'),
     path('<int:pk>/delete/', views.vacancy_delete_view, name='vacancy_delete'),

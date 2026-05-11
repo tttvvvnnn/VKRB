@@ -1,126 +1,175 @@
 {% extends 'base.html' %}
 
-{% block title %}{{ vacancy.title }} — ВППП{% endblock %}
+{% block title %}{{ vacancy.title }} — TalentMatch{% endblock %}
 
 {% block content %}
-<div class="mb-3">
+<div class="d-flex align-items-center gap-3 mb-4">
     <a href="{% url 'vacancy_list' %}" class="btn btn-sm btn-outline-secondary">
-        ← К списку вакансий
+        <i class="bi bi-arrow-left"></i>
     </a>
+    <div class="flex-grow-1">
+        <h1 class="h4 mb-0">{{ vacancy.title }}</h1>
+        <p class="text-muted mb-0" style="font-size:0.85rem;">{{ vacancy.company }}</p>
+    </div>
+    <div class="d-flex gap-2">
+        {% if vacancy.source_url %}
+        <a href="{{ vacancy.source_url }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-secondary">
+            <i class="bi bi-box-arrow-up-right me-1"></i>На сайте источника
+        </a>
+        {% endif %}
+        {% if is_owner %}
+        <a href="{% url 'vacancy_update' vacancy.pk %}" class="btn btn-sm btn-outline-primary">Редактировать</a>
+        <a href="{% url 'vacancy_delete' vacancy.pk %}" class="btn btn-sm btn-outline-danger">Удалить</a>
+        {% else %}
+        <a href="{% url 'vacancy_apply' vacancy.pk %}" class="btn btn-sm btn-primary">
+            <i class="bi bi-send me-1"></i>Откликнуться
+        </a>
+        {% endif %}
+    </div>
 </div>
 
-<div class="card shadow-sm">
-    <div class="card-body">
-        <div class="d-flex justify-content-between align-items-start mb-3">
-            <div>
-                <h1 class="h3 mb-1">{{ vacancy.title }}</h1>
-                <p class="text-muted mb-0">{{ vacancy.company }}</p>
-            </div>
+<div class="row g-4">
+    <div class="col-lg-4">
+        <div class="card" style="border-radius:12px;">
+            <div class="card-body">
+                <p class="section-label mb-3">Основное</p>
 
-            <div class="d-flex gap-2">
-                {% if is_owner %}
-                <a href="{% url 'vacancy_update' vacancy.pk %}" class="btn btn-outline-primary">Редактировать</a>
-                <a href="{% url 'vacancy_delete' vacancy.pk %}" class="btn btn-outline-danger">Удалить</a>
-                {% else %}
-                <a href="{% url 'vacancy_apply' vacancy.pk %}" class="btn btn-primary">Откликнуться</a>
-                {% endif %}
-            </div>
-        </div>
-
-        <hr>
-
-        <div class="row mb-3">
-            <div class="col-md-6">
-                <p><strong>Город:</strong> {{ vacancy.city|default:"Не указан" }}</p>
-                <p><strong>Тип занятости:</strong> {{ vacancy.get_employment_type_display }}</p>
-                <p><strong>Требуемый опыт:</strong> {{ vacancy.required_experience_years }} лет</p>
-            </div>
-
-            <div class="col-md-6">
-                <p>
-                    <strong>Зарплата:</strong>
+                <div class="d-flex flex-column gap-2" style="font-size:0.875rem;">
+                    <div class="d-flex justify-content-between">
+                        <span class="text-muted"><i class="bi bi-geo-alt me-1"></i>Город</span>
+                        <span>{{ vacancy.city|default:"Не указан" }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <span class="text-muted"><i class="bi bi-clock me-1"></i>Занятость</span>
+                        <span>{{ vacancy.get_employment_type_display }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <span class="text-muted"><i class="bi bi-briefcase me-1"></i>Опыт</span>
+                        <span>{{ vacancy.required_experience_years }} лет</span>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <span class="text-muted"><i class="bi bi-eye me-1"></i>Видимость</span>
+                        <span>{{ vacancy.get_visibility_display }}</span>
+                    </div>
                     {% if vacancy.salary_from or vacancy.salary_to %}
-                    {% if vacancy.salary_from %}от {{ vacancy.salary_from }}{% endif %}
-                    {% if vacancy.salary_to %} до {{ vacancy.salary_to }}{% endif %}
-                    {% else %}
-                    Не указана
+                    <hr class="my-1">
+                    <div class="d-flex justify-content-between">
+                        <span class="text-muted"><i class="bi bi-currency-dollar me-1"></i>Зарплата</span>
+                        <span style="color:var(--success);">
+                            {% if vacancy.salary_from %}от {{ vacancy.salary_from }}{% endif %}
+                            {% if vacancy.salary_to %} до {{ vacancy.salary_to }}{% endif %}
+                        </span>
+                    </div>
                     {% endif %}
-                </p>
-                <p><strong>Видимость:</strong> {{ vacancy.get_visibility_display }}</p>
+                </div>
             </div>
         </div>
 
-        <h2 class="h5">Требуемые навыки</h2>
-        <div class="mb-3">
-            {% for skill in vacancy.skill_tags.all %}
-            <span class="badge bg-primary me-1 mb-1">{{ skill.name }}</span>
-            {% empty %}
-            <span class="text-muted">Не указаны</span>
-            {% endfor %}
+        {% if vacancy.skill_tags.exists %}
+        <div class="card mt-3" style="border-radius:12px;">
+            <div class="card-body">
+                <p class="section-label mb-2">Навыки</p>
+                <div class="d-flex flex-wrap gap-1">
+                    {% for skill in vacancy.skill_tags.all %}
+                    <span class="badge bg-primary">{{ skill.name }}</span>
+                    {% endfor %}
+                </div>
+            </div>
         </div>
+        {% endif %}
 
-        <h2 class="h5">Описание вакансии</h2>
-        <p>{{ vacancy.description|linebreaks }}</p>
-
-        <h2 class="h5">Требования к кандидату</h2>
-        <p>{{ vacancy.requirements|default:"Не указаны"|linebreaks }}</p>
-
-        <h2 class="h5">Условия работы</h2>
-        <p>{{ vacancy.conditions|default:"Не указаны"|linebreaks }}</p>
+        {% if vacancy.source_url %}
+        <div class="card mt-3" style="border-radius:12px;">
+            <div class="card-body" style="font-size:0.82rem;">
+                <p class="section-label mb-2"><i class="bi bi-link-45deg me-1"></i>Источник</p>
+                <a href="{{ vacancy.source_url }}" target="_blank" rel="noopener"
+                   class="d-flex align-items-center gap-1" style="word-break:break-all;">
+                    <i class="bi bi-box-arrow-up-right flex-shrink-0"></i>
+                    Открыть оригинал на Труд Всем
+                </a>
+            </div>
+        </div>
+        {% endif %}
     </div>
 
-    <div class="card-footer text-muted small">
-        Создано: {{ vacancy.created_at|date:"d.m.Y H:i" }} |
-        Обновлено: {{ vacancy.updated_at|date:"d.m.Y H:i" }}
+    <div class="col-lg-8 d-flex flex-column gap-3">
+        <div class="card" style="border-radius:12px;">
+            <div class="card-header"><i class="bi bi-text-paragraph me-2"></i>Описание вакансии</div>
+            <div class="card-body" style="font-size:0.9rem;line-height:1.7;">
+                {{ vacancy.description|linebreaksbr }}
+            </div>
+        </div>
+
+        {% if vacancy.requirements %}
+        <div class="card" style="border-radius:12px;">
+            <div class="card-header"><i class="bi bi-person-check me-2"></i>Требования к кандидату</div>
+            <div class="card-body" style="font-size:0.9rem;line-height:1.7;">
+                {{ vacancy.requirements|linebreaksbr }}
+            </div>
+        </div>
+        {% endif %}
+
+        {% if vacancy.conditions %}
+        <div class="card" style="border-radius:12px;">
+            <div class="card-header"><i class="bi bi-gift me-2"></i>Условия и льготы</div>
+            <div class="card-body" style="font-size:0.9rem;line-height:1.7;">
+                {{ vacancy.conditions|linebreaksbr }}
+            </div>
+        </div>
+        {% endif %}
     </div>
 </div>
 
 {% if is_owner %}
-<div class="card shadow-sm mt-4">
+<div class="card mt-4" style="border-radius:12px;">
+    <div class="card-header"><i class="bi bi-inbox me-2"></i>Отклики на вакансию</div>
     <div class="card-body">
-        <h2 class="h4 mb-3">Отклики на вакансию</h2>
-
         {% if applications %}
-        <div class="list-group">
+        <div class="d-flex flex-column gap-2">
             {% for application in applications %}
-            <div class="list-group-item">
-                <div class="d-flex justify-content-between align-items-start">
-                    <div>
-                        <h3 class="h6 mb-1">{{ application.resume.title }}</h3>
-
-                        <p class="mb-1">
-                            <strong>Соискатель:</strong>
-                            {{ application.applicant.email|default:application.applicant.username }}
-                        </p>
-
-                        <p class="mb-1">
-                            <strong>Статус:</strong> {{ application.get_status_display }}
-                        </p>
-
-                        <p class="mb-1">
-                            <strong>Дата отклика:</strong> {{ application.created_at|date:"d.m.Y H:i" }}
-                        </p>
-
-                        {% if application.cover_letter %}
-                        <p class="mb-0">
-                            <strong>Сообщение:</strong> {{ application.cover_letter }}
-                        </p>
-                        {% endif %}
+            <div class="card" style="border-radius:10px;">
+                <div class="card-body py-3">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <h3 class="h6 mb-1">{{ application.resume.title }}</h3>
+                            <p class="text-muted mb-1" style="font-size:0.82rem;">
+                                <i class="bi bi-person me-1"></i>{{ application.applicant.email|default:application.applicant.username }}
+                                &nbsp;·&nbsp;
+                                <i class="bi bi-calendar3 me-1"></i>{{ application.created_at|date:"d.m.Y H:i" }}
+                            </p>
+                            {% if application.cover_letter %}
+                            <p class="mb-0" style="font-size:0.85rem;">{{ application.cover_letter }}</p>
+                            {% endif %}
+                        </div>
+                        <div class="d-flex flex-column align-items-end gap-2 ms-3">
+                            <span class="badge
+                                {% if application.status == 'accepted' %}bg-success
+                                {% elif application.status == 'rejected' %}bg-danger
+                                {% elif application.status == 'viewed' %}bg-warning
+                                {% else %}bg-secondary{% endif %}">
+                                {{ application.get_status_display }}
+                            </span>
+                            <a href="{% url 'resume_detail' application.resume.pk %}"
+                               class="btn btn-sm btn-outline-primary">
+                                Открыть резюме
+                            </a>
+                        </div>
                     </div>
-
-                    <a href="{% url 'resume_detail' application.resume.pk %}" class="btn btn-sm btn-outline-primary">
-                        Открыть резюме
-                    </a>
                 </div>
             </div>
             {% endfor %}
         </div>
         {% else %}
-        <div class="alert alert-info mb-0">
-            На эту вакансию пока нет откликов.
+        <div class="alert alert-secondary mb-0">
+            <i class="bi bi-inbox me-2"></i>На эту вакансию пока нет откликов.
         </div>
         {% endif %}
     </div>
 </div>
 {% endif %}
+
+<div class="text-muted mt-3" style="font-size:0.78rem;">
+    Создано: {{ vacancy.created_at|date:"d.m.Y H:i" }} &nbsp;·&nbsp;
+    Обновлено: {{ vacancy.updated_at|date:"d.m.Y H:i" }}
+</div>
 {% endblock %}

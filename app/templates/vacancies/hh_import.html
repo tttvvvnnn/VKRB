@@ -1,0 +1,189 @@
+{% extends 'base.html' %}
+
+{% block title %}Импорт с hh.ru — TalentMatch{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center gap-3 mb-4">
+    <a href="{% url 'vacancy_list' %}" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i>
+    </a>
+    <div>
+        <h1 class="h4 mb-0">Импорт вакансий с hh.ru</h1>
+        <p class="text-muted mb-0" style="font-size:0.82rem;">
+            Вакансии импортируются как ваши — вы сможете их редактировать и использовать для AI-сопоставления
+        </p>
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-lg-4">
+        <div class="card" style="border-radius:12px;">
+            <div class="card-header d-flex align-items-center gap-2">
+                <i class="bi bi-search" style="color:var(--accent);"></i>
+                Параметры поиска
+            </div>
+            <div class="card-body">
+                <form method="post">
+                    {% csrf_token %}
+
+                    <div class="mb-3">
+                        <label class="form-label">Поисковый запрос</label>
+                        <input type="text"
+                               name="query"
+                               class="form-control"
+                               placeholder="Например: Python разработчик"
+                               value="{{ query|default:'' }}"
+                               required>
+                        <div class="form-text" style="color:var(--text-muted);font-size:0.78rem;">
+                            Название должности, стек, ключевые слова
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Город</label>
+                        <select name="area" class="form-select">
+                            {% for code, name in areas %}
+                            <option value="{{ code }}">{{ name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="mb-4">
+                        <label class="form-label">Количество вакансий</label>
+                        <input type="number"
+                               name="count"
+                               class="form-control"
+                               value="10"
+                               min="1"
+                               max="20">
+                        <div class="form-text" style="color:var(--text-muted);font-size:0.78rem;">
+                            Максимум 20 за один запрос
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="bi bi-cloud-download me-1"></i> Импортировать
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <div class="card mt-3" style="border-radius:12px;">
+            <div class="card-body" style="font-size:0.82rem;">
+                <p class="section-label mb-2"><i class="bi bi-info-circle me-1"></i>Как это работает</p>
+                <ul class="text-muted mb-0" style="padding-left:1.1rem;line-height:1.8;">
+                    <li>Запрос идёт через официальное <a href="https://github.com/hhru/api" target="_blank">hh.ru API</a></li>
+                    <li>Навыки из вакансий автоматически создаются в системе</li>
+                    <li>Дубликаты пропускаются</li>
+                    <li>После импорта можно сразу запустить AI-сопоставление</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-8">
+        {% if done %}
+            {% if imported %}
+            <div class="alert alert-success d-flex align-items-center gap-2 mb-3">
+                <i class="bi bi-check-circle-fill"></i>
+                <span>Импортировано вакансий: <strong>{{ imported|length }}</strong></span>
+            </div>
+
+            <div class="d-flex flex-column gap-2 mb-4">
+                {% for vacancy in imported %}
+                <div class="card" style="border-radius:10px;">
+                    <div class="card-body py-3">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <h3 class="h6 mb-1">
+                                    <a href="{% url 'vacancy_detail' vacancy.pk %}" style="color:var(--text);">
+                                        {{ vacancy.title }}
+                                    </a>
+                                </h3>
+                                <p class="text-muted mb-1" style="font-size:0.82rem;">
+                                    {{ vacancy.company }}
+                                    {% if vacancy.city %} · <i class="bi bi-geo-alt"></i> {{ vacancy.city }}{% endif %}
+                                </p>
+                                <div class="d-flex flex-wrap gap-1 mt-2">
+                                    {% for skill in vacancy.skill_tags.all %}
+                                    <span class="badge bg-secondary">{{ skill.name }}</span>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                            <div class="d-flex gap-2 flex-shrink-0 ms-3">
+                                {% if vacancy.salary_from or vacancy.salary_to %}
+                                <span class="text-muted" style="font-size:0.8rem;white-space:nowrap;">
+                                    <i class="bi bi-currency-dollar"></i>
+                                    {% if vacancy.salary_from %}{{ vacancy.salary_from }}{% endif %}
+                                    {% if vacancy.salary_to %}–{{ vacancy.salary_to }}{% endif %}
+                                </span>
+                                {% endif %}
+                                <a href="{% url 'vacancy_detail' vacancy.pk %}" class="btn btn-sm btn-outline-primary">
+                                    Открыть
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            {% if skipped %}
+            <div class="card mb-3" style="border-radius:10px;">
+                <div class="card-body py-3">
+                    <p class="section-label mb-2">
+                        <i class="bi bi-skip-forward me-1"></i>Пропущено ({{ skipped|length }})
+                    </p>
+                    {% for item in skipped %}
+                    <div class="text-muted" style="font-size:0.82rem;">
+                        {{ item.title }} — {{ item.company }}
+                        <span class="badge bg-secondary ms-1">{{ item.reason }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            {% if errors %}
+            <div class="card mb-3" style="border-radius:10px;border-color:rgba(239,68,68,0.3);">
+                <div class="card-body py-3">
+                    <p class="section-label mb-2" style="color:var(--danger);">
+                        <i class="bi bi-exclamation-triangle me-1"></i>Ошибки ({{ errors|length }})
+                    </p>
+                    {% for item in errors %}
+                    <div class="text-muted" style="font-size:0.82rem;">{{ item.title }}: {{ item.reason }}</div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            {% if not imported and not skipped and not errors %}
+            <div class="alert alert-info">
+                <i class="bi bi-search me-2"></i>По запросу «{{ query }}» вакансий не найдено.
+            </div>
+            {% endif %}
+
+            <div class="d-flex gap-2 mt-2">
+                <a href="{% url 'matching_dashboard' %}" class="btn btn-primary">
+                    <i class="bi bi-stars me-1"></i> Запустить сопоставление
+                </a>
+                <a href="{% url 'vacancy_list' %}" class="btn btn-outline-secondary">
+                    К списку вакансий
+                </a>
+            </div>
+
+        {% else %}
+            <div class="card h-100 d-flex align-items-center justify-content-center"
+                 style="border-radius:12px;border-style:dashed;min-height:300px;">
+                <div class="text-center text-muted p-4">
+                    <i class="bi bi-cloud-download" style="font-size:2.5rem;display:block;margin-bottom:1rem;opacity:0.4;"></i>
+                    <p class="mb-0" style="font-size:0.9rem;">
+                        Заполните форму слева и нажмите «Импортировать»
+                    </p>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

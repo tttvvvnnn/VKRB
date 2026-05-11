@@ -1,72 +1,94 @@
 {% extends 'base.html' %}
 
-{% block title %}Сопоставление — ВППП{% endblock %}
+{% block title %}Сопоставление — TalentMatch{% endblock %}
 
 {% block content %}
-<h1 class="h3 mb-4">Автоматическое сопоставление</h1>
+<div class="mb-4">
+    <h1 class="h3 mb-1">AI-сопоставление</h1>
+    <p class="text-muted" style="font-size:0.85rem;">
+        Выберите резюме или вакансию — система найдёт лучшие совпадения и объяснит каждую оценку
+    </p>
+</div>
 
 <div class="row g-4">
     <div class="col-lg-6">
-        <div class="card shadow-sm h-100">
+        <div class="card h-100" style="border-radius:12px;">
+            <div class="card-header d-flex align-items-center gap-2">
+                <span style="background:rgba(99,102,241,0.15);border-radius:8px;width:32px;height:32px;display:flex;align-items:center;justify-content:center;">
+                    <i class="bi bi-file-person" style="color:#a5b4fc;"></i>
+                </span>
+                Подобрать вакансии по резюме
+            </div>
             <div class="card-body">
-                <h2 class="h4 mb-3">Подобрать вакансии по резюме</h2>
-
-                <p class="text-muted">
-                    Система сравнит выбранное резюме с публичными вакансиями других пользователей
-                    и отсортирует их по релевантности.
+                <p class="text-muted mb-3" style="font-size:0.85rem;">
+                    Система сравнит резюме с публичными вакансиями и отсортирует их по релевантности.
                 </p>
 
                 {% if my_resumes %}
-                    <div class="list-group">
-                        {% for resume in my_resumes %}
-                            <a href="{% url 'match_vacancies_for_resume' resume.pk %}" class="list-group-item list-group-item-action">
-                                <strong>{{ resume.title }}</strong><br>
-                                <span class="text-muted">
-                                    {{ resume.desired_position }} · {{ resume.get_search_status_display }}
-                                </span>
-                            </a>
-                        {% endfor %}
-                    </div>
+                <div class="list-group" style="gap:0;">
+                    {% for resume in my_resumes %}
+                    <a href="{% url 'match_vacancies_for_resume' resume.pk %}"
+                       class="list-group-item list-group-item-action d-flex align-items-center justify-content-between">
+                        <div>
+                            <div class="fw-600" style="font-size:0.875rem;">{{ resume.title }}</div>
+                            <div class="text-muted" style="font-size:0.78rem;">
+                                {{ resume.desired_position }} · {{ resume.get_search_status_display }}
+                            </div>
+                        </div>
+                        <i class="bi bi-chevron-right text-muted" style="font-size:0.75rem;"></i>
+                    </a>
+                    {% endfor %}
+                </div>
                 {% else %}
-                    <div class="alert alert-info mb-0">
-                        Для сопоставления сначала создайте резюме.
-                    </div>
+                <div class="alert alert-secondary mb-0">
+                    <i class="bi bi-plus-circle me-2"></i>
+                    <a href="{% url 'resume_create' %}" style="color:inherit;">Создайте резюме</a>, чтобы начать сопоставление.
+                </div>
                 {% endif %}
             </div>
         </div>
     </div>
 
     <div class="col-lg-6">
-        <div class="card shadow-sm h-100">
+        <div class="card h-100" style="border-radius:12px;">
+            <div class="card-header d-flex align-items-center gap-2">
+                <span style="background:rgba(16,185,129,0.1);border-radius:8px;width:32px;height:32px;display:flex;align-items:center;justify-content:center;">
+                    <i class="bi bi-briefcase" style="color:#6ee7b7;"></i>
+                </span>
+                Подобрать резюме по вакансии
+            </div>
             <div class="card-body">
-                <h2 class="h4 mb-3">Подобрать резюме по вакансии</h2>
-
-                <p class="text-muted">
-                    Система сравнит выбранную вакансию с публичными резюме соискателей
-                    и отсортирует кандидатов по релевантности.
+                <p class="text-muted mb-3" style="font-size:0.85rem;">
+                    Система сравнит вакансию с публичными резюме соискателей и покажет лучших кандидатов.
                 </p>
 
                 {% if is_recruiter %}
                     {% if my_vacancies %}
-                        <div class="list-group">
-                            {% for vacancy in my_vacancies %}
-                                <a href="{% url 'match_resumes_for_vacancy' vacancy.pk %}" class="list-group-item list-group-item-action">
-                                    <strong>{{ vacancy.title }}</strong><br>
-                                    <span class="text-muted">
-                                        {{ vacancy.company }} · {{ vacancy.get_visibility_display }}
-                                    </span>
-                                </a>
-                            {% endfor %}
-                        </div>
+                    <div class="list-group">
+                        {% for vacancy in my_vacancies %}
+                        <a href="{% url 'match_resumes_for_vacancy' vacancy.pk %}"
+                           class="list-group-item list-group-item-action d-flex align-items-center justify-content-between">
+                            <div>
+                                <div class="fw-600" style="font-size:0.875rem;">{{ vacancy.title }}</div>
+                                <div class="text-muted" style="font-size:0.78rem;">
+                                    {{ vacancy.company }} · {{ vacancy.get_visibility_display }}
+                                </div>
+                            </div>
+                            <i class="bi bi-chevron-right text-muted" style="font-size:0.75rem;"></i>
+                        </a>
+                        {% endfor %}
+                    </div>
                     {% else %}
-                        <div class="alert alert-info mb-0">
-                            Для сопоставления сначала создайте вакансию.
-                        </div>
+                    <div class="alert alert-secondary mb-0">
+                        <i class="bi bi-plus-circle me-2"></i>
+                        <a href="{% url 'vacancy_create' %}" style="color:inherit;">Создайте вакансию</a>, чтобы начать подбор.
+                    </div>
                     {% endif %}
                 {% else %}
-                    <div class="alert alert-secondary mb-0">
-                        Подбор резюме по вакансии доступен только пользователям с ролью рекрутера.
-                    </div>
+                <div class="alert alert-secondary mb-0">
+                    <i class="bi bi-lock me-2"></i>
+                    Подбор резюме по вакансии доступен только пользователям с ролью рекрутера.
+                </div>
                 {% endif %}
             </div>
         </div>

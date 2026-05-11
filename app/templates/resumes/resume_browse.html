@@ -1,19 +1,15 @@
 {% extends 'base.html' %}
 
-{% block title %}Все резюме — ВППП{% endblock %}
+{% block title %}Все резюме — TalentMatch{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <div>
-        <h1 class="h3 mb-1">Все резюме</h1>
-        <p class="text-muted mb-0">
-            Публичные резюме кандидатов, доступные для просмотра.
-        </p>
-    </div>
+<div class="mb-4">
+    <h1 class="h3 mb-1">Все резюме</h1>
+    <p class="text-muted mb-0" style="font-size:0.85rem;">Публичные резюме кандидатов, открытых к предложениям</p>
 </div>
 
-<div class="card mb-4">
-    <div class="card-body">
+<div class="card mb-4" style="border-radius:12px;">
+    <div class="card-body py-3">
         <form method="get" class="row g-2 align-items-end">
             <div class="col-md-3">
                 {{ filter_form.search.label_tag }}
@@ -27,17 +23,21 @@
                 {{ filter_form.search_status.label_tag }}
                 {{ filter_form.search_status }}
             </div>
-            <div class="col-md-2">
+            <div class="col-md-3">
                 {{ filter_form.skill.label_tag }}
                 {{ filter_form.skill }}
             </div>
-            <div class="col-md-2 d-flex gap-1">
-                <button type="submit" class="btn btn-primary w-100">Найти</button>
+            <div class="col-md-1">
+                <button type="submit" class="btn btn-primary w-100">
+                    <i class="bi bi-search"></i>
+                </button>
             </div>
         </form>
         {% if request.GET %}
         <div class="mt-2">
-            <a href="{% url 'resume_browse' %}" class="text-muted small">Сбросить фильтры</a>
+            <a href="{% url 'resume_browse' %}" class="text-muted" style="font-size:0.8rem;">
+                <i class="bi bi-x-circle me-1"></i>Сбросить фильтры
+            </a>
         </div>
         {% endif %}
     </div>
@@ -47,19 +47,22 @@
 <div class="row g-3">
     {% for resume in resumes %}
     <div class="col-md-6">
-        <div class="card h-100 shadow-sm">
+        <div class="card card-hover h-100">
             <div class="card-body">
-                <h2 class="h5">
-                    <a href="{% url 'resume_detail' resume.pk %}" class="text-decoration-none">
+                <h2 class="h6 mb-1">
+                    <a href="{% url 'resume_detail' resume.pk %}" style="color:var(--text);">
                         {{ resume.title }}
                     </a>
                 </h2>
 
-                <p class="mb-1"><strong>Кандидат:</strong> {{ resume.full_name }}</p>
-                <p class="mb-1"><strong>Должность:</strong> {{ resume.desired_position }}</p>
-                <p class="mb-1"><strong>Город:</strong> {{ resume.city|default:"Не указан" }}</p>
-                <p class="mb-1"><strong>Опыт:</strong> {{ resume.experience_years }} лет</p>
-                <p class="mb-2"><strong>Статус:</strong> {{ resume.get_search_status_display }}</p>
+                <p class="text-muted mb-1" style="font-size:0.85rem;">{{ resume.full_name }}</p>
+                <p class="text-muted mb-2" style="font-size:0.82rem;">{{ resume.desired_position }}</p>
+
+                <div class="d-flex flex-wrap gap-3 mb-3" style="font-size:0.8rem;color:var(--text-muted);">
+                    {% if resume.city %}<span><i class="bi bi-geo-alt me-1"></i>{{ resume.city }}</span>{% endif %}
+                    <span><i class="bi bi-briefcase me-1"></i>{{ resume.experience_years }} лет</span>
+                    <span><i class="bi bi-search me-1"></i>{{ resume.get_search_status_display }}</span>
+                </div>
 
                 <div class="mb-3">
                     {% for skill in resume.skill_tags.all %}
@@ -71,9 +74,8 @@
                     Открыть резюме
                 </a>
             </div>
-
-            <div class="card-footer text-muted small">
-                Создано: {{ resume.created_at|date:"d.m.Y H:i" }}
+            <div class="card-footer">
+                <i class="bi bi-calendar3 me-1"></i>{{ resume.created_at|date:"d.m.Y" }}
             </div>
         </div>
     </div>
@@ -81,7 +83,7 @@
 </div>
 {% else %}
 <div class="alert alert-info">
-    Публичных резюме не найдено.
+    <i class="bi bi-search me-2"></i>Публичных резюме не найдено.
 </div>
 {% endif %}
 {% endblock %}

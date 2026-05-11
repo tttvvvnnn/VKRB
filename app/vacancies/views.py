@@ -1,5 +1,6 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core.paginator import Paginator
 from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 
@@ -66,11 +67,18 @@ def vacancy_list_view(request):
             public_vacancies = public_vacancies.filter(skill_tags__name__icontains=skill).distinct()
             my_vacancies = my_vacancies.filter(skill_tags__name__icontains=skill).distinct()
 
+    public_page = Paginator(public_vacancies, 12).get_page(request.GET.get('page'))
+
+    filter_params = request.GET.copy()
+    filter_params.pop('page', None)
+    filter_query = filter_params.urlencode()
+
     return render(request, 'vacancies/vacancy_list.html', {
         'my_vacancies': my_vacancies,
-        'public_vacancies': public_vacancies,
+        'public_page': public_page,
         'is_recruiter': user_is_recruiter(request.user),
         'filter_form': filter_form,
+        'filter_query': filter_query,
     })
 
 
@@ -256,6 +264,70 @@ def application_status_update_view(request, pk, status):
 
     messages.success(request, 'Статус отклика обновлён.')
     return redirect('application_list')
+
+
+@login_required
+@recruiter_required
+def hh_import_view(request):
+    from .hh_import import HH_AREAS, import_from_hh
+
+    context = {'areas': HH_AREAS, 'done': False}
+
+    if request.method == 'POST':
+        query = request.POST.get('query', '').strip()
+        area  = request.POST.get('area', '')
+        try:
+            count = max(1, min(20, int(request.POST.get('count') or 10)))
+        except ValueError:
+            count = 10
+
+        if not query:
+            messages.error(request, 'Введите поисковый запрос.')
+            return render(request, 'vacancies/hh_import.html', context)
+
+        try:
+            imported, skipped, errors = import_from_hh(query, area, count, request.user)
+            context.update({
+                'done': True,
+                'imported': imported,
+                'skipped': skipped,
+                'errors': errors,
+                'query': query,
+            })
+        except Exception as e:
+            messages.error(request, f'Ошибка при обращении к hh.ru: {e}')
+
+    return render(request, 'vacancies/hh_import.html', context)
+
+
+@login_required
+@recruiter_required
+def trudvsem_import_view(request):
+    from .trudvsem_import import TRUDVSEM_REGIONS, import_from_trudvsem
+
+    context = {'regions': TRUDVSEM_REGIONS, 'done': False}
+
+    if request.method == 'POST':
+        query       = request.POST.get('query', '').strip()
+        region_code = request.POST.get('region_code', '')
+        try:
+            count = max(1, min(100, int(request.POST.get('count') or 10)))
+        except ValueError:
+            count = 10
+
+        try:
+            imported, skipped, errors = import_from_trudvsem(query, region_code, count, request.user)
+            context.update({
+                'done': True,
+                'imported': imported,
+                'skipped': skipped,
+                'errors': errors,
+                'query': query,
+            })
+        except Exception as e:
+            messages.error(request, f'Ошибка при обращении к Труд Всем: {e}')
+
+    return render(request, 'vacancies/trudvsem_import.html', context)
 
 
 @login_required

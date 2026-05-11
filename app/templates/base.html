@@ -2,25 +2,282 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>{% block title %}Веб-приложение для подбора персонала{% endblock %}</title>
-
+    <title>{% block title %}TalentMatch{% endblock %}</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
-    <link
-            href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
-            rel="stylesheet"
-    >
-    <link
-            href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.bootstrap5.min.css"
-            rel="stylesheet"
-    >
-</head>
-<body class="bg-light">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/tom-select@2.3.1/dist/css/tom-select.bootstrap5.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
-<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+    <style>
+        :root {
+            --bg-base:      #0f172a;
+            --bg-surface:   #1e293b;
+            --bg-elevated:  #273344;
+            --border:       #334155;
+            --text:         #f1f5f9;
+            --text-muted:   #94a3b8;
+            --accent:       #6366f1;
+            --accent-hover: #4f46e5;
+            --accent-glow:  rgba(99,102,241,0.15);
+            --success:      #10b981;
+            --danger:       #ef4444;
+            --warning:      #f59e0b;
+        }
+
+        *, *::before, *::after { box-sizing: border-box; }
+
+        body {
+            background-color: var(--bg-base);
+            color: var(--text);
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            font-size: 0.925rem;
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        h1, h2, h3, h4, h5, h6 { color: var(--text); font-weight: 600; letter-spacing: -0.01em; }
+        p { color: var(--text); margin-bottom: 0.75rem; }
+        a { color: var(--accent); text-decoration: none; }
+        a:hover { color: var(--accent-hover); }
+        hr { border-color: var(--border); opacity: 1; margin: 1.25rem 0; }
+        strong { color: var(--text); font-weight: 600; }
+        .text-muted { color: var(--text-muted) !important; }
+
+        /* ── Navbar ── */
+        .navbar {
+            background-color: var(--bg-surface) !important;
+            border-bottom: 1px solid var(--border);
+            padding: 0.6rem 0;
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            backdrop-filter: blur(8px);
+        }
+        .navbar-brand {
+            font-weight: 700;
+            font-size: 1.05rem;
+            color: var(--text) !important;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            letter-spacing: -0.02em;
+        }
+        .brand-icon {
+            background: linear-gradient(135deg, var(--accent), #8b5cf6);
+            border-radius: 8px;
+            width: 28px; height: 28px;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 0.8rem; color: white;
+            flex-shrink: 0;
+        }
+        .nav-link {
+            color: var(--text-muted) !important;
+            font-size: 0.85rem;
+            font-weight: 500;
+            padding: 0.35rem 0.7rem !important;
+            border-radius: 6px;
+            transition: color 0.15s, background 0.15s;
+            display: flex; align-items: center; gap: 0.35rem;
+            white-space: nowrap;
+        }
+        .nav-link:hover { color: var(--text) !important; background: var(--bg-elevated); }
+        .nav-link.active-nav { color: var(--text) !important; background: var(--accent-glow); }
+        .navbar-toggler { border-color: var(--border); }
+        .navbar-toggler-icon { filter: invert(0.7); }
+        .user-avatar {
+            width: 30px; height: 30px; border-radius: 50%;
+            background: linear-gradient(135deg, var(--accent), #8b5cf6);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 0.7rem; font-weight: 700; color: white;
+            text-transform: uppercase; flex-shrink: 0;
+        }
+
+        /* ── Cards ── */
+        .card {
+            background-color: var(--bg-surface);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            color: var(--text);
+            transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+        }
+        .card-hover:hover {
+            border-color: rgba(99,102,241,0.45);
+            box-shadow: 0 8px 30px rgba(0,0,0,0.35);
+            transform: translateY(-2px);
+        }
+        .card-header {
+            background-color: var(--bg-elevated);
+            border-bottom: 1px solid var(--border);
+            color: var(--text); font-weight: 600;
+            border-radius: 12px 12px 0 0 !important;
+        }
+        .card-footer {
+            background-color: var(--bg-elevated);
+            border-top: 1px solid var(--border);
+            color: var(--text-muted); font-size: 0.8rem;
+            border-radius: 0 0 12px 12px !important;
+        }
+
+        /* ── Buttons ── */
+        .btn { font-weight: 500; border-radius: 8px; font-size: 0.875rem; transition: all 0.15s; }
+
+        .btn-primary { background-color: var(--accent); border-color: var(--accent); color: white; }
+        .btn-primary:hover { background-color: var(--accent-hover); border-color: var(--accent-hover); color: white; }
+        .btn-primary:focus { box-shadow: 0 0 0 3px var(--accent-glow); }
+
+        .btn-outline-primary { color: var(--accent); border-color: var(--accent); background: transparent; }
+        .btn-outline-primary:hover { background-color: var(--accent); border-color: var(--accent); color: white; }
+
+        .btn-outline-secondary { color: var(--text-muted); border-color: var(--border); background: transparent; }
+        .btn-outline-secondary:hover { background-color: var(--bg-elevated); border-color: var(--border); color: var(--text); }
+
+        .btn-outline-danger { color: var(--danger); border-color: var(--danger); background: transparent; }
+        .btn-outline-danger:hover { background-color: var(--danger); color: white; }
+
+        .btn-outline-success { color: var(--success); border-color: var(--success); background: transparent; }
+        .btn-outline-success:hover { background-color: var(--success); color: white; }
+
+        .btn-outline-light { color: var(--text-muted); border-color: var(--border); background: transparent; }
+        .btn-outline-light:hover { background-color: var(--bg-elevated); color: var(--text); border-color: var(--border); }
+
+        /* ── Forms ── */
+        .form-control, .form-select {
+            background-color: var(--bg-elevated);
+            border: 1px solid var(--border);
+            color: var(--text);
+            border-radius: 8px;
+            font-size: 0.875rem;
+        }
+        .form-control:focus, .form-select:focus {
+            background-color: var(--bg-elevated);
+            border-color: var(--accent);
+            color: var(--text);
+            box-shadow: 0 0 0 3px var(--accent-glow);
+        }
+        .form-control::placeholder { color: var(--text-muted); }
+        .form-label {
+            color: var(--text-muted); font-size: 0.78rem; font-weight: 600;
+            text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.35rem;
+        }
+        .form-select option { background-color: var(--bg-surface); color: var(--text); }
+        textarea.form-control { resize: vertical; min-height: 90px; }
+
+        /* ── Badges ── */
+        .badge { font-weight: 500; border-radius: 6px; font-size: 0.73rem; padding: 0.3em 0.6em; }
+        .badge.bg-primary  { background-color: rgba(99,102,241,0.2) !important; color: #a5b4fc !important; border: 1px solid rgba(99,102,241,0.35); }
+        .badge.bg-secondary{ background-color: var(--bg-elevated) !important; color: var(--text-muted) !important; border: 1px solid var(--border); }
+        .badge.bg-success  { background-color: rgba(16,185,129,0.15) !important; color: #6ee7b7 !important; border: 1px solid rgba(16,185,129,0.3); }
+        .badge.bg-danger   { background-color: rgba(239,68,68,0.15) !important; color: #fca5a5 !important; border: 1px solid rgba(239,68,68,0.3); }
+        .badge.bg-warning  { background-color: rgba(245,158,11,0.15) !important; color: #fcd34d !important; border: 1px solid rgba(245,158,11,0.3); }
+
+        /* ── Alerts ── */
+        .alert { border-radius: 10px; font-size: 0.875rem; }
+        .alert-info      { background: rgba(99,102,241,0.08); border-color: rgba(99,102,241,0.3); color: #a5b4fc; }
+        .alert-secondary { background: var(--bg-elevated); border-color: var(--border); color: var(--text-muted); }
+        .alert-success   { background: rgba(16,185,129,0.08); border-color: rgba(16,185,129,0.3); color: #6ee7b7; }
+        .alert-danger, .alert-error { background: rgba(239,68,68,0.08); border-color: rgba(239,68,68,0.3); color: #fca5a5; }
+        .alert-warning   { background: rgba(245,158,11,0.08); border-color: rgba(245,158,11,0.3); color: #fcd34d; }
+        .btn-close { filter: invert(0.6); }
+
+        /* ── Progress ── */
+        .progress { background-color: var(--bg-elevated); border-radius: 8px; overflow: hidden; }
+        .progress-bar { border-radius: 8px; font-size: 0.78rem; font-weight: 600; }
+        .progress-bar.bg-success { background-color: var(--success) !important; }
+        .progress-bar.bg-warning { background-color: var(--warning) !important; }
+        .progress-bar.bg-danger  { background-color: var(--danger) !important; }
+
+        /* ── List groups ── */
+        .list-group-item {
+            background-color: var(--bg-surface);
+            border-color: var(--border);
+            color: var(--text);
+            transition: background 0.15s;
+        }
+        .list-group-item:hover { background-color: var(--bg-elevated); }
+        .list-group-item:first-child { border-radius: 10px 10px 0 0 !important; }
+        .list-group-item:last-child  { border-radius: 0 0 10px 10px !important; }
+        .list-group-item:only-child  { border-radius: 10px !important; }
+
+        /* ── Tables ── */
+        .table {
+            --bs-table-bg: transparent;
+            --bs-table-color: var(--text);
+            --bs-table-border-color: var(--border);
+            --bs-table-striped-bg: var(--bg-elevated);
+            --bs-table-hover-bg: var(--bg-elevated);
+            color: var(--text);
+        }
+        .table-light {
+            --bs-table-bg: var(--bg-elevated) !important;
+            --bs-table-color: var(--text-muted) !important;
+            --bs-table-border-color: var(--border) !important;
+        }
+        tfoot.table-light {
+            --bs-table-color: var(--text) !important;
+        }
+        .table td, .table th { border-color: var(--border); vertical-align: middle; }
+        .table-bordered { border-color: var(--border); }
+        .table-sm td, .table-sm th { padding: 0.4rem 0.6rem; font-size: 0.85rem; }
+
+        /* ── Tom Select dark ── */
+        .ts-wrapper .ts-control,
+        .ts-wrapper.multi .ts-control {
+            background-color: var(--bg-elevated) !important;
+            border-color: var(--border) !important;
+            color: var(--text) !important;
+            border-radius: 8px !important;
+            min-height: 38px;
+        }
+        .ts-wrapper.focus .ts-control { border-color: var(--accent) !important; box-shadow: 0 0 0 3px var(--accent-glow) !important; }
+        .ts-wrapper .ts-control input { color: var(--text) !important; }
+        .ts-wrapper .ts-control input::placeholder { color: var(--text-muted) !important; }
+        .ts-wrapper .ts-dropdown {
+            background-color: var(--bg-surface) !important;
+            border-color: var(--border) !important;
+            border-radius: 8px !important;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.5) !important;
+        }
+        .ts-wrapper .ts-dropdown .option { color: var(--text); padding: 0.45rem 0.75rem; }
+        .ts-wrapper .ts-dropdown .option:hover,
+        .ts-wrapper .ts-dropdown .option.active { background: var(--accent) !important; color: white !important; }
+        .ts-wrapper .ts-control .item {
+            background: rgba(99,102,241,0.15) !important;
+            color: #a5b4fc !important;
+            border: 1px solid rgba(99,102,241,0.3) !important;
+            border-radius: 5px !important;
+            font-size: 0.8rem;
+        }
+        .ts-wrapper .ts-control .item .remove {
+            color: #a5b4fc !important;
+            border-left-color: rgba(99,102,241,0.3) !important;
+        }
+
+        /* ── Utility ── */
+        .section-label {
+            font-size: 0.72rem; font-weight: 700;
+            text-transform: uppercase; letter-spacing: 0.08em;
+            color: var(--text-muted); margin-bottom: 0.6rem;
+        }
+        .stat-block { text-align: center; }
+        .stat-block .stat-value { font-size: 1.75rem; font-weight: 700; color: var(--text); line-height: 1.1; }
+        .stat-block .stat-label { font-size: 0.78rem; color: var(--text-muted); margin-top: 0.15rem; }
+
+        ::-webkit-scrollbar { width: 5px; }
+        ::-webkit-scrollbar-track { background: var(--bg-base); }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+        {% block extra_css %}{% endblock %}
+    </style>
+</head>
+<body>
+
+<nav class="navbar navbar-expand-lg">
     <div class="container">
         <a class="navbar-brand" href="{% url 'home' %}">
-            ВППП
+            <span class="brand-icon"><i class="bi bi-lightning-charge-fill"></i></span>
+            TalentMatch
         </a>
 
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#mainNavbar">
@@ -28,38 +285,56 @@
         </button>
 
         <div class="collapse navbar-collapse" id="mainNavbar">
-            <ul class="navbar-nav me-auto">
+            <ul class="navbar-nav me-auto gap-1 ms-3">
                 {% if user.is_authenticated %}
                 <li class="nav-item">
-                    <a class="nav-link" href="{% url 'resume_list' %}">Мои резюме</a>
+                    <a class="nav-link {% if request.resolver_match.url_name == 'resume_list' %}active-nav{% endif %}"
+                       href="{% url 'resume_list' %}">
+                        <i class="bi bi-file-person"></i> Мои резюме
+                    </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link" href="{% url 'resume_browse' %}">Все резюме</a>
+                    <a class="nav-link {% if request.resolver_match.url_name == 'resume_browse' %}active-nav{% endif %}"
+                       href="{% url 'resume_browse' %}">
+                        <i class="bi bi-people"></i> Все резюме
+                    </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link" href="{% url 'vacancy_list' %}">Вакансии</a>
+                    <a class="nav-link {% if request.resolver_match.url_name == 'vacancy_list' %}active-nav{% endif %}"
+                       href="{% url 'vacancy_list' %}">
+                        <i class="bi bi-briefcase"></i> Вакансии
+                    </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link" href="{% url 'application_list' %}">Отклики</a>
+                    <a class="nav-link {% if request.resolver_match.url_name == 'application_list' %}active-nav{% endif %}"
+                       href="{% url 'application_list' %}">
+                        <i class="bi bi-inbox"></i> Отклики
+                    </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link" href="{% url 'matching_dashboard' %}">Сопоставление</a>
+                    <a class="nav-link {% if 'match' in request.resolver_match.url_name %}active-nav{% endif %}"
+                       href="{% url 'matching_dashboard' %}">
+                        <i class="bi bi-stars"></i> Сопоставление
+                    </a>
                 </li>
                 {% endif %}
             </ul>
 
-            <ul class="navbar-nav ms-auto">
+            <ul class="navbar-nav ms-auto align-items-center gap-2">
                 {% if user.is_authenticated %}
                 <li class="nav-item">
-                    <a class="nav-link" href="{% url 'profile' %}">
-                        {{ user.email|default:user.username }}
+                    <a class="nav-link d-flex align-items-center gap-2" href="{% url 'profile' %}">
+                        <span class="user-avatar">{{ user.email|first|upper }}</span>
+                        <span class="d-none d-xl-inline" style="color:var(--text-muted);font-size:0.8rem;">
+                            {{ user.email|default:user.username }}
+                        </span>
                     </a>
                 </li>
                 <li class="nav-item">
-                    <form method="post" action="{% url 'logout' %}" class="d-inline">
+                    <form method="post" action="{% url 'logout' %}">
                         {% csrf_token %}
-                        <button type="submit" class="btn btn-outline-light btn-sm">
-                            Выйти
+                        <button type="submit" class="btn btn-outline-secondary btn-sm">
+                            <i class="bi bi-box-arrow-right"></i> Выйти
                         </button>
                     </form>
                 </li>
@@ -68,9 +343,7 @@
                     <a class="nav-link" href="{% url 'login' %}">Войти</a>
                 </li>
                 <li class="nav-item">
-                    <a class="btn btn-primary btn-sm ms-lg-2" href="{% url 'register' %}">
-                        Регистрация
-                    </a>
+                    <a class="btn btn-primary btn-sm" href="{% url 'register' %}">Начать бесплатно</a>
                 </li>
                 {% endif %}
             </ul>
@@ -81,15 +354,14 @@
 <main class="container py-4">
     {% if messages %}
     {% for message in messages %}
-    <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+    <div class="alert alert-{{ message.tags }} alert-dismissible fade show mb-3" role="alert">
         {{ message }}
         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     </div>
     {% endfor %}
     {% endif %}
 
-    {% block content %}
-    {% endblock %}
+    {% block content %}{% endblock %}
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
@@ -103,6 +375,6 @@
         });
     });
 </script>
-
+{% block extra_js %}{% endblock %}
 </body>
 </html>

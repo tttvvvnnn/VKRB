@@ -1,0 +1,317 @@
+{% extends 'base.html' %}
+{% block title %}Сопоставление… — TalentMatch{% endblock %}
+
+{% block content %}
+
+<div class="d-flex align-items-center gap-3 mb-4">
+    <div class="flex-grow-1">
+        <h1 class="h4 mb-0">AI-сопоставление</h1>
+        <p class="text-muted mb-0" style="font-size:0.85rem;">{{ subject }}</p>
+    </div>
+    <button id="btn-cancel" class="btn btn-sm btn-outline-danger">
+        <i class="bi bi-stop-circle me-1"></i>Остановить
+    </button>
+</div>
+
+<!-- Progress bar -->
+<div class="card mb-4" style="border-radius:12px;">
+    <div class="card-body py-3">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <span id="status-text" class="text-muted" style="font-size:0.85rem;">Запускаем анализ…</span>
+            <span id="counter" class="text-muted" style="font-size:0.82rem;">0 / {{ total }}</span>
+        </div>
+        <div class="progress" style="height:6px;">
+            <div id="progress-bar"
+                 class="progress-bar bg-primary progress-bar-striped progress-bar-animated"
+                 style="width:0%;transition:width 0.4s ease;"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Spinner shown while computing -->
+<div id="spinner-row" class="text-center text-muted mb-4" style="font-size:0.85rem;">
+    <div style="
+        width:32px;height:32px;border-radius:50%;
+        border:3px solid var(--border);border-top-color:var(--accent);
+        animation:spin 0.8s linear infinite;
+        display:inline-block;vertical-align:middle;margin-right:8px;
+    "></div>
+    Groq AI обрабатывает пары…
+</div>
+
+<!-- Done banner (hidden until done) -->
+<div id="done-banner" class="alert alert-success d-flex align-items-center gap-2 mb-4" style="display:none!important;">
+    <i class="bi bi-check-circle-fill"></i>
+    <span id="done-text">Анализ завершён.</span>
+</div>
+
+<!-- Results stream -->
+<div id="results-container" class="d-flex flex-column gap-3"></div>
+
+<style>
+@keyframes spin { to { transform: rotate(360deg); } }
+.result-card { animation: fadeIn 0.3s ease; }
+@keyframes fadeIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:none; } }
+.score-circle {
+    width:72px; height:72px; border-radius:50%;
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    font-weight:700; flex-shrink:0; border:3px solid;
+}
+.score-circle .score-val { font-size:1.1rem; line-height:1; }
+.score-circle .score-lbl { font-size:0.6rem; font-weight:500; opacity:0.8; margin-top:1px; }
+.score-high { border-color:var(--success); color:var(--success); background:rgba(16,185,129,0.08); }
+.score-mid  { border-color:var(--warning); color:var(--warning); background:rgba(245,158,11,0.08); }
+.score-low  { border-color:var(--danger);  color:var(--danger);  background:rgba(239,68,68,0.08);  }
+</style>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+    const POLL_URL    = "{{ poll_url }}";
+    const CANCEL_URL  = "{{ cancel_url }}";
+    const DONE_URL    = "{{ done_url }}";
+    const TOTAL       = {{ total|default:0 }};
+    const MODE        = "{{ mode }}";
+
+    const statusText  = document.getElementById('status-text');
+    const counter     = document.getElementById('counter');
+    const progressBar = document.getElementById('progress-bar');
+    const spinner     = document.getElementById('spinner-row');
+    const doneBanner  = document.getElementById('done-banner');
+    const doneText    = document.getElementById('done-text');
+    const container   = document.getElementById('results-container');
+    const btnCancel   = document.getElementById('btn-cancel');
+
+    let lastCount = 0;
+    let stopped   = false;
+
+    // ── Cancel ────────────────────────────────────────────────────────────────
+    btnCancel.addEventListener('click', function () {
+        if (stopped) return;
+        fetch(CANCEL_URL, {
+            method: 'POST',
+            headers: {'X-CSRFToken': getCsrf()},
+        }).then(() => {
+            stopped = true;
+            btnCancel.disabled = true;
+            statusText.textContent = 'Обработка остановлена.';
+        });
+    });
+
+    // ── Card renderer ─────────────────────────────────────────────────────────
+    function scoreColor(p) {
+        if (p >= 70) return 'var(--success)';
+        if (p >= 40) return 'var(--warning)';
+        return 'var(--danger)';
+    }
+
+    function skillBadges(skills, type) {
+        const color = type === 'matched' ? 'bg-success' : 'bg-danger';
+        return skills.map(s => `<span class="badge ${color}">${s}</span>`).join(' ');
+    }
+
+    function renderBreakdown(breakdown, idx) {
+        if (!breakdown || !breakdown.length) return '';
+        const rows = breakdown.map(row => `
+            <tr>
+                <td>${row.label}${row.note ? `<br><small class="text-muted">${row.note}</small>` : ''}</td>
+                <td class="text-end">${row.score_percent}%</td>
+                <td class="text-end">${row.weight}%</td>
+                <td class="text-end fw-bold">${row.contribution} б.</td>
+            </tr>`).join('');
+        const total = breakdown.reduce((s, r) => s + r.contribution, 0).toFixed(1);
+        return `
+        <div class="collapse mt-3" id="bd-${idx}">
+            <table class="table table-sm table-bordered mb-0" style="font-size:0.82rem;">
+                <thead class="table-light">
+                    <tr>
+                        <th>Компонент</th>
+                        <th class="text-end" style="width:80px;">Оценка</th>
+                        <th class="text-end" style="width:60px;">Вес</th>
+                        <th class="text-end" style="width:80px;">Вклад</th>
+                    </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+                <tfoot class="table-light">
+                    <tr>
+                        <td colspan="3" class="fw-bold">Итого</td>
+                        <td class="text-end fw-bold">${total} б.</td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>`;
+    }
+
+    let cardIdx = 0;
+    function renderVacancyCard(r) {
+        const idx = cardIdx++;
+        const salary = (r.salary_from || r.salary_to)
+            ? `<span style="color:var(--success);font-size:0.8rem;">
+                <i class="bi bi-currency-dollar"></i>
+                ${r.salary_from ? 'от ' + r.salary_from : ''}
+                ${r.salary_to   ? ' до ' + r.salary_to  : ''}
+               </span>`
+            : '';
+        const aiBadge = r.ai_used
+            ? '<span class="badge bg-primary ms-1"><i class="bi bi-stars me-1"></i>AI</span>'
+            : '<span class="badge bg-secondary ms-1">TF-IDF</span>';
+        const sourceLink = r.source_url
+            ? `<a href="${r.source_url}" target="_blank" class="btn btn-sm btn-outline-secondary">
+                 <i class="bi bi-box-arrow-up-right"></i>
+               </a>`
+            : '';
+        const pct = Math.max(0, Math.min(100, Math.round(r.score_percent)));
+        const barColor = pct >= 70 ? 'bg-success' : pct >= 40 ? 'bg-warning' : 'bg-danger';
+        return `
+        <div class="card result-card" style="border-radius:12px;">
+          <div class="card-body">
+            <div class="d-flex gap-3 align-items-start">
+              <div class="score-circle ${pct >= 70 ? 'score-high' : pct >= 40 ? 'score-mid' : 'score-low'}">
+                <span class="score-val">${r.score_percent.toFixed(0)}</span>
+                <span class="score-lbl">баллов</span>
+              </div>
+              <div class="flex-grow-1">
+                <div class="d-flex align-items-center gap-2 mb-1">
+                  <h3 class="h6 mb-0">
+                    <a href="/vacancies/${r.pk}/" style="color:var(--text);">${r.title}</a>
+                  </h3>
+                  ${aiBadge}
+                </div>
+                <p class="text-muted mb-2" style="font-size:0.82rem;">
+                  ${r.company}${r.city ? ` · <i class="bi bi-geo-alt"></i> ${r.city}` : ''}
+                </p>
+                <div class="progress mb-3" style="height:6px;">
+                  <div class="progress-bar ${barColor}" style="width:${pct}%;"></div>
+                </div>
+                <div class="d-flex flex-wrap gap-1 mb-2">
+                  ${skillBadges(r.matched_skills, 'matched')}
+                  ${skillBadges(r.missing_skills, 'missing')}
+                </div>
+                ${r.explanation ? `<p class="text-muted mb-2" style="font-size:0.82rem;font-style:italic;">${r.ai_used ? '<i class="bi bi-stars me-1" style="color:var(--accent);"></i>' : ''}${r.explanation}</p>` : ''}
+                <div class="d-flex gap-2 flex-wrap align-items-center">
+                  <button class="btn btn-sm btn-outline-secondary" type="button"
+                          data-bs-toggle="collapse" data-bs-target="#bd-${idx}">
+                    <i class="bi bi-bar-chart me-1"></i>Разбивка оценки
+                  </button>
+                  <a href="/vacancies/${r.pk}/" class="btn btn-sm btn-outline-primary">Открыть</a>
+                  ${sourceLink}
+                  ${salary}
+                </div>
+                ${renderBreakdown(r.breakdown, idx)}
+              </div>
+            </div>
+          </div>
+        </div>`;
+    }
+
+    function renderResumeCard(r) {
+        const idx = cardIdx++;
+        const aiBadge = r.ai_used
+            ? '<span class="badge bg-primary ms-1"><i class="bi bi-stars me-1"></i>AI</span>'
+            : '<span class="badge bg-secondary ms-1">TF-IDF</span>';
+        const pct = Math.max(0, Math.min(100, Math.round(r.score_percent)));
+        const barColor = pct >= 70 ? 'bg-success' : pct >= 40 ? 'bg-warning' : 'bg-danger';
+        return `
+        <div class="card result-card" style="border-radius:12px;">
+          <div class="card-body">
+            <div class="d-flex gap-3 align-items-start">
+              <div class="score-circle ${pct >= 70 ? 'score-high' : pct >= 40 ? 'score-mid' : 'score-low'}">
+                <span class="score-val">${r.score_percent.toFixed(0)}</span>
+                <span class="score-lbl">баллов</span>
+              </div>
+              <div class="flex-grow-1">
+                <div class="d-flex align-items-center gap-2 mb-1">
+                  <h3 class="h6 mb-0">
+                    <a href="/resumes/${r.pk}/" style="color:var(--text);">${r.full_name || r.title}</a>
+                  </h3>
+                  ${aiBadge}
+                </div>
+                <p class="text-muted mb-1" style="font-size:0.82rem;">
+                  ${r.desired_position || ''}${r.city ? ` · <i class="bi bi-geo-alt"></i> ${r.city}` : ''}
+                </p>
+                <p class="text-muted mb-2" style="font-size:0.82rem;">
+                  <i class="bi bi-briefcase me-1"></i>${r.experience_years} лет опыта
+                </p>
+                <div class="progress mb-3" style="height:6px;">
+                  <div class="progress-bar ${barColor}" style="width:${pct}%;"></div>
+                </div>
+                <div class="d-flex flex-wrap gap-1 mb-2">
+                  ${skillBadges(r.matched_skills, 'matched')}
+                  ${skillBadges(r.missing_skills, 'missing')}
+                </div>
+                ${r.explanation ? `<p class="text-muted mb-2" style="font-size:0.82rem;font-style:italic;">${r.ai_used ? '<i class="bi bi-stars me-1" style="color:var(--accent);"></i>' : ''}${r.explanation}</p>` : ''}
+                <div class="d-flex gap-2 flex-wrap align-items-center">
+                  <button class="btn btn-sm btn-outline-secondary" type="button"
+                          data-bs-toggle="collapse" data-bs-target="#bd-${idx}">
+                    <i class="bi bi-bar-chart me-1"></i>Разбивка оценки
+                  </button>
+                  <a href="/resumes/${r.pk}/" class="btn btn-sm btn-outline-primary">Открыть резюме</a>
+                </div>
+                ${renderBreakdown(r.breakdown, idx)}
+              </div>
+            </div>
+          </div>
+        </div>`;
+    }
+
+    const renderCard = MODE === 'vacancy' ? renderVacancyCard : renderResumeCard;
+
+    // ── Re-render sorted results (skip 0%) ────────────────────────────────────
+    function renderAll(results) {
+        container.innerHTML = results
+            .filter(r => r.score_percent > 0)
+            .map(renderCard).join('');
+    }
+
+    // ── Poll ──────────────────────────────────────────────────────────────────
+    function poll() {
+        fetch(POLL_URL)
+            .then(r => r.json())
+            .then(data => {
+                const computed = data.computed || 0;
+                const total    = data.total || TOTAL || 1;
+                const pct      = Math.round(computed / total * 100);
+
+                counter.textContent     = `${computed} / ${total}`;
+                progressBar.style.width = pct + '%';
+
+                if (data.results && data.results.length > lastCount) {
+                    lastCount = data.results.length;
+                    renderAll(data.results);
+                    statusText.textContent = `Обработано ${computed} из ${total}…`;
+                }
+
+                if (data.done || data.cancel) {
+                    spinner.style.display   = 'none';
+                    btnCancel.style.display = 'none';
+                    progressBar.classList.remove('progress-bar-animated', 'progress-bar-striped');
+                    progressBar.style.width = '100%';
+
+                    const n = data.results ? data.results.length : 0;
+                    const reason = data.cancel ? 'Остановлено вручную.' : 'Анализ завершён.';
+                    doneText.textContent    = `${reason} Найдено совпадений: ${n}.`;
+                    doneBanner.style.display = '';
+
+                    if (data.error) {
+                        statusText.textContent = 'Ошибка: ' + data.error;
+                    } else {
+                        statusText.textContent = 'Готово.';
+                    }
+                } else {
+                    setTimeout(poll, 2000);
+                }
+            })
+            .catch(() => setTimeout(poll, 3000));
+    }
+
+    function getCsrf() {
+        const m = document.cookie.match(/csrftoken=([^;]+)/);
+        return m ? m[1] : '';
+    }
+
+    setTimeout(poll, 1500);
+})();
+</script>
+{% endblock %}

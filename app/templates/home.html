@@ -1,35 +1,151 @@
 {% extends 'base.html' %}
 
-{% block title %}Главная — ВППП{% endblock %}
+{% block title %}TalentMatch — Умный подбор кадров{% endblock %}
+
+{% block extra_css %}
+.hero {
+    background: linear-gradient(135deg, #0f172a 0%, #1a1040 45%, #0f172a 100%);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 4rem 3rem;
+    position: relative;
+    overflow: hidden;
+}
+.hero::before {
+    content: '';
+    position: absolute;
+    top: -80px; right: -80px;
+    width: 320px; height: 320px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(99,102,241,0.15) 0%, transparent 70%);
+    pointer-events: none;
+}
+.hero::after {
+    content: '';
+    position: absolute;
+    bottom: -60px; left: 10%;
+    width: 200px; height: 200px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(139,92,246,0.1) 0%, transparent 70%);
+    pointer-events: none;
+}
+.hero-badge {
+    display: inline-flex; align-items: center; gap: 0.4rem;
+    background: rgba(99,102,241,0.12);
+    border: 1px solid rgba(99,102,241,0.3);
+    border-radius: 20px;
+    padding: 0.3rem 0.9rem;
+    font-size: 0.78rem; font-weight: 600;
+    color: #a5b4fc;
+    margin-bottom: 1.5rem;
+}
+.hero-title {
+    font-size: clamp(2rem, 4vw, 3rem);
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    line-height: 1.15;
+    margin-bottom: 1rem;
+    background: linear-gradient(135deg, #f1f5f9 30%, #a5b4fc 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+.hero-sub {
+    font-size: 1rem;
+    color: var(--text-muted);
+    max-width: 520px;
+    margin-bottom: 2rem;
+    line-height: 1.7;
+}
+.feature-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.5rem;
+    height: 100%;
+    transition: border-color 0.2s, transform 0.2s;
+}
+.feature-card:hover {
+    border-color: rgba(99,102,241,0.4);
+    transform: translateY(-3px);
+}
+.feature-icon {
+    width: 44px; height: 44px;
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.2rem; margin-bottom: 1rem;
+}
+{% endblock %}
 
 {% block content %}
-<div class="p-5 bg-white rounded shadow-sm">
-    <h1 class="mb-3">Веб-приложение для подбора персонала</h1>
-
-    <p class="lead">
-        Система предназначена для хранения резюме и вакансий,
-        а также автоматического сопоставления кандидатов с требованиями вакансий.
+<div class="hero mb-4">
+    <div class="hero-badge">
+        <i class="bi bi-stars"></i> AI-сопоставление кандидатов
+    </div>
+    <h1 class="hero-title">Умный подбор кадров<br>без лишнего шума</h1>
+    <p class="hero-sub">
+        Загружайте резюме и вакансии — система автоматически найдёт лучших кандидатов,
+        учитывая навыки, релевантный опыт и контекст с помощью AI.
     </p>
 
     {% if user.is_authenticated %}
-        <p class="mb-4">
-            Вы вошли как <strong>{{ user.email|default:user.username }}</strong>.
-        </p>
-
-        <div class="d-flex gap-2">
-            <a href="{% url 'resume_list' %}" class="btn btn-primary">Мои резюме</a>
-            <a href="{% url 'vacancy_list' %}" class="btn btn-outline-primary">Мои вакансии</a>
-            <a href="{% url 'matching_dashboard' %}" class="btn btn-outline-secondary">Сопоставление</a>
-        </div>
+    <div class="d-flex gap-3 flex-wrap">
+        <a href="{% url 'matching_dashboard' %}" class="btn btn-primary">
+            <i class="bi bi-stars me-1"></i> Запустить сопоставление
+        </a>
+        <a href="{% url 'resume_list' %}" class="btn btn-outline-secondary">
+            Мои резюме
+        </a>
+        <a href="{% url 'vacancy_list' %}" class="btn btn-outline-secondary">
+            Вакансии
+        </a>
+    </div>
     {% else %}
-        <p class="mb-4">
-            Для работы с резюме и вакансиями необходимо зарегистрироваться или войти в систему.
-        </p>
-
-        <div class="d-flex gap-2">
-            <a href="{% url 'register' %}" class="btn btn-primary">Зарегистрироваться</a>
-            <a href="{% url 'login' %}" class="btn btn-outline-primary">Войти</a>
-        </div>
+    <div class="d-flex gap-3 flex-wrap">
+        <a href="{% url 'register' %}" class="btn btn-primary btn-lg">
+            Начать бесплатно <i class="bi bi-arrow-right ms-1"></i>
+        </a>
+        <a href="{% url 'login' %}" class="btn btn-outline-secondary btn-lg">Войти</a>
+    </div>
     {% endif %}
+</div>
+
+<div class="row g-3">
+    <div class="col-md-4">
+        <div class="feature-card">
+            <div class="feature-icon" style="background:rgba(99,102,241,0.12);">
+                <i class="bi bi-file-person" style="color:#a5b4fc;"></i>
+            </div>
+            <h3 class="h6 mb-1">Резюме</h3>
+            <p class="text-muted mb-0" style="font-size:0.85rem;line-height:1.6;">
+                Создавайте резюме с навыками, опытом работы и статусом поиска.
+                Управляйте видимостью для рекрутеров.
+            </p>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="feature-card">
+            <div class="feature-icon" style="background:rgba(16,185,129,0.1);">
+                <i class="bi bi-briefcase" style="color:#6ee7b7;"></i>
+            </div>
+            <h3 class="h6 mb-1">Вакансии</h3>
+            <p class="text-muted mb-0" style="font-size:0.85rem;line-height:1.6;">
+                Публикуйте вакансии с требованиями, зарплатой и стеком технологий.
+                Получайте отклики от кандидатов.
+            </p>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="feature-card">
+            <div class="feature-icon" style="background:rgba(245,158,11,0.1);">
+                <i class="bi bi-stars" style="color:#fcd34d;"></i>
+            </div>
+            <h3 class="h6 mb-1">AI-сопоставление</h3>
+            <p class="text-muted mb-0" style="font-size:0.85rem;line-height:1.6;">
+                Groq AI анализирует релевантный опыт, навыки и контекст —
+                не просто ключевые слова, а реальное соответствие.
+            </p>
+        </div>
+    </div>
 </div>
 {% endblock %}
