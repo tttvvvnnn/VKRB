@@ -94,7 +94,7 @@ def calculate_city_score(resume, vacancy):
 def calculate_ai_score(resume, vacancy):
     api_key = os.environ.get('GROQ_API_KEY', '').strip()
     if not api_key:
-        return None, ''
+        return None, '', None
 
     from groq import Groq
 
@@ -115,8 +115,11 @@ def calculate_ai_score(resume, vacancy):
 Требования: {(vacancy.requirements or 'не указаны')[:600]}
 Описание: {vacancy.description[:600]}
 
+Также определи, сколько лет РЕЛЕВАНТНОГО опыта (непосредственно по профилю данной вакансии) есть у кандидата.
+Опыт в несвязанных сферах (например, год работы электриком при вакансии разработчика) не считается релевантным.
+
 Ответь только валидным JSON:
-{{"score": <число 0-100>, "explanation": "<одно предложение на русском — почему такая оценка>"}}"""
+{{"score": <число 0-100>, "relevant_experience_years": <число лет релевантного опыта, float>, "explanation": "<одно предложение на русском — почему такая оценка>"}}"""
 
     client = Groq(api_key=api_key)
     response = client.chat.completions.create(
@@ -138,26 +141,32 @@ def calculate_ai_score(resume, vacancy):
     text = response.choices[0].message.content.strip()
     match = re.search(r'\{[^{}]+\}', text, re.DOTALL)
     if not match:
-        return None, ''
+        return None, '', None
 
     data = json.loads(match.group())
     score = max(0.0, min(100.0, float(data['score']))) / 100.0
+    relevant_exp = max(0.0, float(data.get('relevant_experience_years', 0)))
     explanation = data.get('explanation', '')
-    return score, explanation
+    return score, explanation, relevant_exp
 
 
 def _compute_match(resume, vacancy):
     skill_data = calculate_skill_score(resume, vacancy)
-    experience_score = calculate_experience_score(resume, vacancy)
     city_score = calculate_city_score(resume, vacancy)
 
-    ai_score, ai_explanation = None, ''
+    ai_score, ai_explanation, relevant_exp_years = None, '', None
     try:
-        ai_score, ai_explanation = calculate_ai_score(resume, vacancy)
+        ai_score, ai_explanation, relevant_exp_years = calculate_ai_score(resume, vacancy)
     except Exception as e:
         print(f'[Groq AI] Ошибка при вызове API: {e}', flush=True)
 
     if ai_score is not None:
+        required_exp = float(vacancy.required_experience_years or 0)
+        if required_exp <= 0:
+            experience_score = 1.0
+        else:
+            experience_score = min(1.0, relevant_exp_years / required_exp)
+
         final_score = (
             skill_data['score'] * 0.35 +
             ai_score * 0.35 +
@@ -167,7 +176,17 @@ def _compute_match(resume, vacancy):
         explanation = ai_explanation
         text_score_percent = round(ai_score * 100, 2)
         ai_used = True
+        breakdown = _build_breakdown(
+            skill_score=skill_data['score'],
+            second_score=ai_score,
+            second_label='AI-оценка',
+            experience_score=experience_score,
+            city_score=city_score,
+            weights=(35, 35, 20, 10),
+            experience_note=_experience_note(relevant_exp_years, required_exp),
+        )
     else:
+        experience_score = calculate_experience_score(resume, vacancy)
         text_score = calculate_text_similarity(resume, vacancy)
         final_score = (
             skill_data['score'] * 0.40 +
@@ -184,6 +203,15 @@ def _compute_match(resume, vacancy):
         )
         text_score_percent = round(text_score * 100, 2)
         ai_used = False
+        required_exp = float(vacancy.required_experience_years or 0)
+        breakdown = _build_breakdown(
+            skill_score=skill_data['score'],
+            second_score=text_score,
+            second_label='Текстовое сходство',
+            experience_score=experience_score,
+            city_score=city_score,
+            weights=(40, 35, 20, 5),
+        )
 
     score_percent = round(final_score * 100, 2)
 
@@ -200,6 +228,8 @@ def _compute_match(resume, vacancy):
         'progress_percent': max(0, min(100, round(score_percent))),
         'ai_used': ai_used,
         'ai_score': ai_score,
+        'relevant_experience_years': relevant_exp_years,
+        'breakdown': breakdown,
     }
 
 
@@ -209,6 +239,27 @@ def calculate_match(resume, vacancy):
     try:
         cached = MatchResult.objects.get(resume=resume, vacancy=vacancy)
         if cached.calculated_at >= resume.updated_at and cached.calculated_at >= vacancy.updated_at:
+            required_exp = float(vacancy.required_experience_years or 0)
+            if cached.ai_used:
+                exp_note = _experience_note(cached.relevant_experience_years, required_exp)
+                breakdown = _build_breakdown(
+                    skill_score=cached.skill_score_percent / 100,
+                    second_score=cached.text_score_percent / 100,
+                    second_label='AI-оценка',
+                    experience_score=cached.experience_score_percent / 100,
+                    city_score=cached.city_score_percent / 100,
+                    weights=(35, 35, 20, 10),
+                    experience_note=exp_note,
+                )
+            else:
+                breakdown = _build_breakdown(
+                    skill_score=cached.skill_score_percent / 100,
+                    second_score=cached.text_score_percent / 100,
+                    second_label='Текстовое сходство',
+                    experience_score=cached.experience_score_percent / 100,
+                    city_score=cached.city_score_percent / 100,
+                    weights=(40, 35, 20, 5),
+                )
             return {
                 'score': cached.score,
                 'score_percent': cached.score_percent,
@@ -222,6 +273,8 @@ def calculate_match(resume, vacancy):
                 'progress_percent': max(0, min(100, round(cached.score_percent))),
                 'ai_used': cached.ai_used,
                 'ai_score': cached.ai_score,
+                'relevant_experience_years': cached.relevant_experience_years,
+                'breakdown': breakdown,
             }
     except MatchResult.DoesNotExist:
         pass
@@ -244,10 +297,53 @@ def calculate_match(resume, vacancy):
             'ai_score': result['ai_score'],
             'ai_used': result['ai_used'],
             'ai_explanation': result['explanation'] if result['ai_used'] else '',
+            'relevant_experience_years': result['relevant_experience_years'],
         }
     )
 
     return result
+
+
+def _experience_note(relevant_years, required_years):
+    if relevant_years is None:
+        return ''
+    if required_years <= 0:
+        return f'{relevant_years:.1f} лет (требований нет)'
+    return f'{relevant_years:.1f} из {required_years:.0f} лет релевантного опыта'
+
+
+def _build_breakdown(skill_score, second_score, second_label, experience_score, city_score, weights, experience_note=''):
+    w_skill, w_second, w_exp, w_city = weights
+    return [
+        {
+            'label': 'Навыки',
+            'score_percent': round(skill_score * 100, 1),
+            'weight': w_skill,
+            'contribution': round(skill_score * w_skill, 1),
+            'note': '',
+        },
+        {
+            'label': second_label,
+            'score_percent': round(second_score * 100, 1),
+            'weight': w_second,
+            'contribution': round(second_score * w_second, 1),
+            'note': '',
+        },
+        {
+            'label': 'Опыт',
+            'score_percent': round(experience_score * 100, 1),
+            'weight': w_exp,
+            'contribution': round(experience_score * w_exp, 1),
+            'note': experience_note,
+        },
+        {
+            'label': 'Город',
+            'score_percent': round(city_score * 100, 1),
+            'weight': w_city,
+            'contribution': round(city_score * w_city, 1),
+            'note': '',
+        },
+    ]
 
 
 def build_explanation(score_percent, skill_data, text_score, experience_score, city_score):

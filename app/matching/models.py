@@ -30,6 +30,7 @@ class MatchResult(models.Model):
     ai_score = models.FloatField(null=True, blank=True, verbose_name='Балл Groq AI')
     ai_explanation = models.TextField(blank=True, default='', verbose_name='Пояснение Groq AI')
     ai_used = models.BooleanField(default=False, verbose_name='Использован Groq AI')
+    relevant_experience_years = models.FloatField(null=True, blank=True, verbose_name='Релевантный опыт (лет)')
 
     calculated_at = models.DateTimeField(auto_now=True, verbose_name='Дата расчёта')
 

@@ -65,9 +65,48 @@
                     {% endif %}
                 </p>
 
-                <p class="mb-0 text-muted fst-italic">
+                <p class="mb-2 text-muted fst-italic">
                     {% if item.ai_used %}✦{% endif %} {{ item.explanation }}
                 </p>
+
+                <button class="btn btn-sm btn-outline-secondary"
+                        type="button"
+                        data-bs-toggle="collapse"
+                        data-bs-target="#breakdown-{{ forloop.counter }}"
+                        aria-expanded="false">
+                    Из чего складывается оценка
+                </button>
+                <div class="collapse mt-2" id="breakdown-{{ forloop.counter }}">
+                    <table class="table table-sm table-bordered mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Компонент</th>
+                                <th class="text-end">Оценка</th>
+                                <th class="text-end">Вес</th>
+                                <th class="text-end">Вклад в итог</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in item.breakdown %}
+                            <tr>
+                                <td>
+                                    {{ row.label }}
+                                    {% if row.note %}<br><small class="text-muted">{{ row.note }}</small>{% endif %}
+                                </td>
+                                <td class="text-end">{{ row.score_percent }}%</td>
+                                <td class="text-end">{{ row.weight }}%</td>
+                                <td class="text-end">{{ row.contribution }} б.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                        <tfoot class="table-light fw-bold">
+                            <tr>
+                                <td colspan="3">Итого</td>
+                                <td class="text-end">{{ item.score_percent }} б.</td>
+                            </tr>
+                        </tfoot>
+                    </table>
+                </div>
             </div>
 
             <div class="d-flex flex-column gap-2 flex-shrink-0">
