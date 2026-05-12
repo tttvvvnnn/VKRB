@@ -18,6 +18,8 @@ urlpatterns = [
         name='application_delete'
     ),
 
+    path('trudvsem/more/', views.trudvsem_load_more, name='trudvsem_load_more'),
+    path('trudvsem/<str:vac_id>/', views.trudvsem_vacancy_detail_view, name='trudvsem_vacancy_detail'),
     path('import/hh/', views.hh_import_view, name='hh_import'),
     path('import/trudvsem/', views.trudvsem_import_view, name='trudvsem_import'),
 

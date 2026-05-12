@@ -100,27 +100,45 @@ class VacancyApplicationForm(forms.ModelForm):
             self.fields['resume'].empty_label = 'Выберите резюме'
 
 
+EXPERIENCE_CHOICES = [
+    ('', 'Любой опыт'),
+    ('0', 'Без опыта'),
+    ('1', 'До 1 года'),
+    ('3', 'До 3 лет'),
+    ('6', 'До 6 лет'),
+    ('6+', 'Более 6 лет'),
+]
+
+SORT_CHOICES = [
+    ('-created_at', 'Сначала новые'),
+    ('created_at',  'Сначала старые'),
+    ('-salary_from', 'По убыванию зарплаты'),
+    ('salary_from',  'По возрастанию зарплаты'),
+    ('-required_experience_years', 'По убыванию опыта'),
+]
+
+
 class VacancyFilterForm(forms.Form):
     search = forms.CharField(
         required=False,
         label='Поиск',
         widget=forms.TextInput(attrs={
             'class': 'form-control',
-            'placeholder': 'Название, компания, описание...'
+            'placeholder': 'Должность, компания, описание…',
         })
     )
-    employment_type = forms.ChoiceField(
+    employment_type = forms.MultipleChoiceField(
         required=False,
         label='Тип занятости',
-        choices=[('', 'Любой')] + Vacancy.EmploymentType.choices,
-        widget=forms.Select(attrs={'class': 'form-select'})
+        choices=Vacancy.EmploymentType.choices,
+        widget=forms.CheckboxSelectMultiple,
     )
     city = forms.CharField(
         required=False,
         label='Город',
         widget=forms.TextInput(attrs={
             'class': 'form-control',
-            'placeholder': 'Город'
+            'placeholder': 'Например: Москва',
         })
     )
     salary_min = forms.IntegerField(
@@ -129,14 +147,43 @@ class VacancyFilterForm(forms.Form):
         min_value=0,
         widget=forms.NumberInput(attrs={
             'class': 'form-control',
-            'placeholder': 'Например: 80000'
+            'placeholder': '0',
         })
+    )
+    salary_max = forms.IntegerField(
+        required=False,
+        label='до',
+        min_value=0,
+        widget=forms.NumberInput(attrs={
+            'class': 'form-control',
+            'placeholder': '∞',
+        })
+    )
+    has_salary = forms.BooleanField(
+        required=False,
+        label='Только с указанной зарплатой',
+    )
+    experience = forms.ChoiceField(
+        required=False,
+        label='Требуемый опыт',
+        choices=EXPERIENCE_CHOICES,
+        widget=forms.Select(attrs={'class': 'form-select'}),
     )
     skill = forms.CharField(
         required=False,
         label='Навык',
         widget=forms.TextInput(attrs={
             'class': 'form-control',
-            'placeholder': 'Например: Python'
+            'placeholder': 'Например: Python',
         })
+    )
+    with_source = forms.BooleanField(
+        required=False,
+        label='Только с Труд Всем',
+    )
+    sort_by = forms.ChoiceField(
+        required=False,
+        label='Сортировка',
+        choices=SORT_CHOICES,
+        widget=forms.Select(attrs={'class': 'form-select'}),
     )

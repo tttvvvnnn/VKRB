@@ -22,63 +22,142 @@ def user_is_recruiter(user):
 
 @login_required
 def vacancy_list_view(request):
+    from .forms import EXPERIENCE_CHOICES, SORT_CHOICES
     filter_form = VacancyFilterForm(request.GET or None)
 
     my_vacancies = Vacancy.objects.filter(owner=request.user).prefetch_related('skill_tags')
-
     public_vacancies = Vacancy.objects.filter(
         visibility=Vacancy.Visibility.PUBLIC
-    ).exclude(
-        owner=request.user
-    ).prefetch_related('skill_tags')
+    ).exclude(owner=request.user).prefetch_related('skill_tags')
+
+    # Distinct cities for hint
+    cities = (
+        Vacancy.objects.filter(visibility=Vacancy.Visibility.PUBLIC)
+        .exclude(city='').exclude(city__isnull=True)
+        .values_list('city', flat=True).distinct().order_by('city')[:60]
+    )
+
+    sort_order = '-created_at'
 
     if filter_form.is_valid():
-        search = filter_form.cleaned_data.get('search')
-        employment_type = filter_form.cleaned_data.get('employment_type')
-        city = filter_form.cleaned_data.get('city')
-        salary_min = filter_form.cleaned_data.get('salary_min')
-        skill = filter_form.cleaned_data.get('skill')
+        d = filter_form.cleaned_data
 
+        search = d.get('search')
         if search:
-            public_vacancies = public_vacancies.filter(
-                Q(title__icontains=search) |
-                Q(company__icontains=search) |
-                Q(description__icontains=search)
-            )
-            my_vacancies = my_vacancies.filter(
-                Q(title__icontains=search) |
-                Q(company__icontains=search) |
-                Q(description__icontains=search)
-            )
+            q = Q(title__icontains=search) | Q(company__icontains=search) | Q(description__icontains=search)
+            public_vacancies = public_vacancies.filter(q)
+            my_vacancies = my_vacancies.filter(q)
 
-        if employment_type:
-            public_vacancies = public_vacancies.filter(employment_type=employment_type)
-            my_vacancies = my_vacancies.filter(employment_type=employment_type)
+        employment_types = d.get('employment_type')
+        if employment_types:
+            public_vacancies = public_vacancies.filter(employment_type__in=employment_types)
+            my_vacancies = my_vacancies.filter(employment_type__in=employment_types)
 
+        city = d.get('city')
         if city:
             public_vacancies = public_vacancies.filter(city__icontains=city)
             my_vacancies = my_vacancies.filter(city__icontains=city)
 
+        salary_min = d.get('salary_min')
         if salary_min:
             public_vacancies = public_vacancies.filter(salary_from__gte=salary_min)
             my_vacancies = my_vacancies.filter(salary_from__gte=salary_min)
 
+        salary_max = d.get('salary_max')
+        if salary_max:
+            public_vacancies = public_vacancies.filter(
+                Q(salary_to__lte=salary_max) | Q(salary_from__lte=salary_max)
+            )
+            my_vacancies = my_vacancies.filter(
+                Q(salary_to__lte=salary_max) | Q(salary_from__lte=salary_max)
+            )
+
+        if d.get('has_salary'):
+            public_vacancies = public_vacancies.filter(salary_from__isnull=False)
+            my_vacancies = my_vacancies.filter(salary_from__isnull=False)
+
+        experience = d.get('experience')
+        if experience == '0':
+            public_vacancies = public_vacancies.filter(required_experience_years=0)
+            my_vacancies = my_vacancies.filter(required_experience_years=0)
+        elif experience == '1':
+            public_vacancies = public_vacancies.filter(required_experience_years__lte=1)
+            my_vacancies = my_vacancies.filter(required_experience_years__lte=1)
+        elif experience == '3':
+            public_vacancies = public_vacancies.filter(required_experience_years__lte=3)
+            my_vacancies = my_vacancies.filter(required_experience_years__lte=3)
+        elif experience == '6':
+            public_vacancies = public_vacancies.filter(required_experience_years__lte=6)
+            my_vacancies = my_vacancies.filter(required_experience_years__lte=6)
+        elif experience == '6+':
+            public_vacancies = public_vacancies.filter(required_experience_years__gt=6)
+            my_vacancies = my_vacancies.filter(required_experience_years__gt=6)
+
+        skill = d.get('skill')
         if skill:
             public_vacancies = public_vacancies.filter(skill_tags__name__icontains=skill).distinct()
             my_vacancies = my_vacancies.filter(skill_tags__name__icontains=skill).distinct()
 
+        if d.get('with_source'):
+            public_vacancies = public_vacancies.exclude(source_url='')
+            my_vacancies = my_vacancies.exclude(source_url='')
+
+        sort_order = d.get('sort_by') or '-created_at'
+
+    public_vacancies = public_vacancies.order_by(sort_order)
     public_page = Paginator(public_vacancies, 12).get_page(request.GET.get('page'))
 
     filter_params = request.GET.copy()
     filter_params.pop('page', None)
     filter_query = filter_params.urlencode()
 
+    active_filters = sum(1 for k, v in request.GET.items() if v and k not in ('page', 'sort_by'))
+
+    directions = [
+        'IT / Разработка', 'Аналитика / Data', 'DevOps', 'QA / Тестирование',
+        'Дизайн', 'Маркетинг', 'Продажи', 'Финансы', 'HR', 'Образование',
+        'Медицина', 'Юриспруденция',
+    ]
+
+    # ── Live trudvsem results (first 2 pages = 24 results) ───────────────────
+    from .trudvsem_import import _vac_uid, city_to_region_code, format_live_item, live_search
+
+    search_query = filter_form.cleaned_data.get('search', '') if filter_form.is_valid() else ''
+    city_text    = filter_form.cleaned_data.get('city', '')    if filter_form.is_valid() else ''
+    region_code  = city_to_region_code(city_text)
+
+    from django.core.cache import cache
+
+    live_results = []
+    live_total   = 0
+    live_error   = None
+    try:
+        items1, live_total = live_search(search_query, region_code, offset=0,  per_page=12)
+        items2, _          = live_search(search_query, region_code, offset=12, per_page=12)
+        raw_items = items1 + items2
+        for raw in raw_items:
+            uid = _vac_uid(raw)
+            if uid:
+                cache.set(f'trudvsem_vac_{uid}', raw, 3600)
+        live_results = [format_live_item(i) for i in raw_items]
+    except Exception as e:
+        live_error = str(e)
+
     return render(request, 'vacancies/vacancy_list.html', {
         'my_vacancies': my_vacancies,
-        'public_page': public_page,
         'is_recruiter': user_is_recruiter(request.user),
         'filter_form': filter_form,
         'filter_query': filter_query,
+        'cities': list(cities),
+        'active_filters': active_filters,
+        'directions': directions,
+        # live trudvsem
+        'live_results': live_results,
+        'live_total':   live_total,
+        'live_loaded':  len(live_results),
+        'live_error':   live_error,
+        'live_search':  search_query,
+        'live_region':  region_code or '',
     })
 
 
@@ -264,6 +343,65 @@ def application_status_update_view(request, pk, status):
 
     messages.success(request, 'Статус отклика обновлён.')
     return redirect('application_list')
+
+
+@login_required
+def trudvsem_vacancy_detail_view(request, vac_id):
+    import logging
+    from .trudvsem_import import fetch_vacancy, format_vacancy_detail
+    from django.core.cache import cache
+
+    log = logging.getLogger(__name__)
+    error = None
+    vacancy = None
+
+    item = cache.get(f'trudvsem_vac_{vac_id}')
+    log.warning('TRUDVSEM DETAIL | vac_id=%s | cache_hit=%s | title=%s | vac_url=%s',
+                vac_id, item is not None,
+                (item or {}).get('job-name', '—'),
+                (item or {}).get('vac_url', '—'))
+    if not item:
+        try:
+            item = fetch_vacancy(vac_id)
+        except Exception as e:
+            error = str(e)
+
+    if item:
+        vacancy = format_vacancy_detail(item)
+    elif not error:
+        error = 'Вакансия не найдена. Вернитесь в список и откройте её снова.'
+
+    return render(request, 'vacancies/trudvsem_vacancy_detail.html', {
+        'vacancy': vacancy,
+        'error': error,
+        'vac_id': vac_id,
+    })
+
+
+@login_required
+def trudvsem_load_more(request):
+    """AJAX endpoint: returns next page of live trudvsem results as JSON."""
+    from .trudvsem_import import _vac_uid, format_live_item, live_search
+    from django.core.cache import cache
+    from django.http import JsonResponse
+
+    search      = request.GET.get('search', '')
+    region_code = request.GET.get('region_code', '') or None
+    try:
+        offset = max(0, int(request.GET.get('offset', 0)))
+    except ValueError:
+        offset = 0
+
+    try:
+        items, total = live_search(search, region_code, offset=offset, per_page=12)
+        for raw in items:
+            uid = _vac_uid(raw)
+            if uid:
+                cache.set(f'trudvsem_vac_{uid}', raw, 3600)
+        results = [format_live_item(i) for i in items]
+        return JsonResponse({'results': results, 'total': total, 'offset': offset, 'count': len(results)})
+    except Exception as e:
+        return JsonResponse({'error': str(e), 'results': [], 'total': 0}, status=500)
 
 
 @login_required

@@ -1,10 +1,36 @@
+import hashlib
 import json
+import ssl
 import time
 import urllib.parse
 import urllib.request
 
 TRUDVSEM_API = 'https://opendata.trudvsem.ru/api/v1'
 HEADERS = {'User-Agent': 'TalentMatch/1.0 (educational project)'}
+
+# Маппинг популярных городов → код региона trudvsem
+CITY_TO_REGION = {
+    'москва':            '77',
+    'санкт-петербург':   '78',
+    'питер':             '78',
+    'спб':               '78',
+    'екатеринбург':      '66',
+    'новосибирск':       '54',
+    'нижний новгород':   '52',
+    'нижний':            '52',
+    'тюмень':            '72',
+    'казань':            '16',
+    'ростов':            '61',
+    'красноярск':        '24',
+    'челябинск':         '74',
+    'уфа':               '02',
+    'воронеж':           '36',
+    'самара':            '63',
+    'омск':              '55',
+    'краснодар':         '23',
+    'пермь':             '59',
+    'волгоград':         '34',
+}
 
 TRUDVSEM_REGIONS = [
     ('', 'Вся Россия'),
@@ -39,14 +65,50 @@ SCHEDULE_RU_TO_TYPE = {
 SKILL_PREFIX = 'навык работы с '
 
 
+def _vac_uid(item):
+    """Stable unique ID for a vacancy based on its URL (vac_url is unique per vacancy)."""
+    import logging
+    log = logging.getLogger(__name__)
+
+    url = (item.get('vac_url') or '').strip()
+    if url:
+        return hashlib.sha1(url.encode()).hexdigest()[:20]
+
+    # vac_url missing — log so we can see which vacancies are affected
+    title = (item.get('job-name') or '').strip()
+    company_id = str((item.get('company') or {}).get('id') or '')
+    internal_id = str(item.get('id') or '')
+    uid = hashlib.sha1(f'{company_id}_{internal_id}'.encode()).hexdigest()[:20]
+    log.warning('TRUDVSEM _vac_uid | NO vac_url | title=%r | company_id=%r | internal_id=%r | uid=%s',
+                title, company_id, internal_id, uid)
+    return uid
+
+
 def _api_get(path, params=None):
     url = TRUDVSEM_API + path
     if params:
         clean = {k: v for k, v in params.items() if v is not None and v != ''}
         url += '?' + urllib.parse.urlencode(clean)
     req = urllib.request.Request(url, headers=HEADERS)
-    with urllib.request.urlopen(req, timeout=15) as resp:
-        return json.loads(resp.read().decode('utf-8'))
+
+    # trudvsem.ru often drops SSL connections; retry with a permissive context on failure
+    for attempt in range(2):
+        try:
+            if attempt == 0:
+                ctx = ssl.create_default_context()
+            else:
+                ctx = ssl.create_default_context()
+                ctx.check_hostname = False
+                ctx.verify_mode = ssl.CERT_NONE
+            with urllib.request.urlopen(req, timeout=15, context=ctx) as resp:
+                return json.loads(resp.read().decode('utf-8'))
+        except Exception as exc:
+            if attempt == 1:
+                raise
+            err = str(exc)
+            if 'SSL' in err or 'EOF' in err or 'certificate' in err.lower():
+                continue
+            raise
 
 
 def search_trudvsem(query, region_code=None, count=10):
@@ -63,9 +125,15 @@ def search_trudvsem(query, region_code=None, count=10):
     return [v['vacancy'] for v in vacancies_raw if isinstance(v, dict) and 'vacancy' in v]
 
 
-def live_search(query, region_code=None, page=1, per_page=12):
+def city_to_region_code(city_text):
+    """Try to map a city name to a trudvsem region code."""
+    if not city_text:
+        return None
+    return CITY_TO_REGION.get(city_text.strip().lower())
+
+
+def live_search(query, region_code=None, offset=0, per_page=12):
     """Live search for vacancy list page. Returns (items, total)."""
-    offset = (page - 1) * per_page
     params = {'limit': per_page, 'offset': offset}
     if query:
         params['text'] = query
@@ -77,6 +145,75 @@ def live_search(query, region_code=None, page=1, per_page=12):
     vacancies_raw = (data.get('results') or {}).get('vacancies') or []
     items = [v['vacancy'] for v in vacancies_raw if isinstance(v, dict) and 'vacancy' in v]
     return items, total
+
+
+def format_live_item(item):
+    """Convert raw trudvsem API dict to a clean dict for template rendering."""
+    region = item.get('region') or {}
+    city = (region.get('name') or '').replace('Город ', '').replace('г. ', '').strip()
+    requirement = item.get('requirement') or {}
+    salary_min = item.get('salary_min')
+    salary_max = item.get('salary_max')
+    skills_raw = list(set(item.get('skills') or []))
+    skills = [_clean_skill(s) for s in skills_raw if s]
+    skills = [s for s in skills if s][:8]
+    return {
+        'id':          _vac_uid(item),
+        'title':       (item.get('job-name') or '').strip(),
+        'company':     ((item.get('company') or {}).get('name') or '').strip(),
+        'city':        city,
+        'salary_from': int(salary_min) if salary_min else None,
+        'salary_to':   int(salary_max) if salary_max else None,
+        'employment':  (item.get('employment') or '').strip(),
+        'experience':  requirement.get('experience', 0),
+        'source_url':  (item.get('vac_url') or '').strip(),
+        'description': (item.get('duty') or '')[:300].strip(),
+        'skills':      skills,
+    }
+
+
+def fetch_vacancy(vac_id):
+    """Fetch a single vacancy by its Trudvsem internal id."""
+    try:
+        data = _api_get(f'/vacancies/vacancy/{vac_id}')
+        item = (data.get('results') or {}).get('vacancy')
+        if item:
+            return item
+    except Exception:
+        pass
+    return {}
+
+
+def format_vacancy_detail(item):
+    """Convert raw trudvsem API dict to a full dict for the detail page."""
+    region = item.get('region') or {}
+    city = (region.get('name') or '').replace('Город ', '').replace('г. ', '').strip()
+    requirement = item.get('requirement') or {}
+    salary_min = item.get('salary_min')
+    salary_max = item.get('salary_max')
+    skills_raw = list(set(item.get('skills') or []))
+    skills = [_clean_skill(s) for s in skills_raw if s]
+    skills = [s for s in skills if s]
+    contact = item.get('contact') or {}
+    return {
+        'id':           _vac_uid(item),
+        'title':        (item.get('job-name') or '').strip(),
+        'company':      ((item.get('company') or {}).get('name') or '').strip(),
+        'city':         city,
+        'salary_from':  int(salary_min) if salary_min else None,
+        'salary_to':    int(salary_max) if salary_max else None,
+        'employment':   (item.get('employment') or '').strip(),
+        'schedule':     (item.get('schedule') or '').strip(),
+        'experience':   requirement.get('experience', 0),
+        'source_url':   (item.get('vac_url') or '').strip(),
+        'description':  (item.get('duty') or '').strip(),
+        'requirements': (item.get('requirements') or '').strip(),
+        'conditions':   (item.get('benefit') or '').strip(),
+        'skills':       skills,
+        'contact_name': (contact.get('full-name') or contact.get('name') or '').strip(),
+        'contact_phone': (contact.get('phones') or contact.get('phone') or '').strip(),
+        'contact_email': (contact.get('email') or '').strip(),
+    }
 
 
 def _clean_skill(raw):
