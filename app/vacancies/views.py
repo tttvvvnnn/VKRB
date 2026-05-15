@@ -375,16 +375,24 @@ def trudvsem_vacancy_detail_view(request, vac_id):
     if item:
         vacancy = format_vacancy_detail(item)
         if vacancy:
-            from matching.services import extract_skills_from_text
+            from matching.services import extract_skills_from_text, resolve_skills_to_db
+            # Map raw API skills to DB skills (filters out long phrases)
+            api_skills_resolved = resolve_skills_to_db(vacancy.get('skills') or [], threshold=0.55)
+            # Extract skills from vacancy text
             vacancy_text = ' '.join(filter(None, [
                 vacancy.get('title', ''),
                 vacancy.get('description', ''),
                 vacancy.get('requirements', ''),
             ]))
-            extracted = extract_skills_from_text(vacancy_text)
-            existing_lower = {s.lower() for s in (vacancy.get('skills') or [])}
-            extra_skills = [s for s in extracted if s.lower() not in existing_lower]
-            vacancy['skills'] = list(vacancy.get('skills') or []) + extra_skills
+            text_skills = extract_skills_from_text(vacancy_text)
+            # Merge deduplicated
+            seen = {s.lower() for s in api_skills_resolved}
+            merged = list(api_skills_resolved)
+            for s in text_skills:
+                if s.lower() not in seen:
+                    seen.add(s.lower())
+                    merged.append(s)
+            vacancy['skills'] = merged
     elif not error:
         error = 'Вакансия не найдена. Вернитесь в список и откройте её снова.'
 
