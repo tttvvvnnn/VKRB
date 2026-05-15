@@ -121,7 +121,12 @@ def calculate_ai_score(resume, vacancy):
 Ответь только валидным JSON:
 {{"score": <число 0-100>, "relevant_experience_years": <число лет релевантного опыта, float>, "explanation": "<одно предложение на русском — почему такая оценка>"}}"""
 
-    client = Groq(api_key=api_key)
+    groq_kwargs = {'api_key': api_key}
+    groq_base_url = os.environ.get('GROQ_BASE_URL', '').strip()
+    if groq_base_url:
+        groq_kwargs['base_url'] = groq_base_url
+
+    client = Groq(**groq_kwargs)
     response = client.chat.completions.create(
         model='llama-3.3-70b-versatile',
         messages=[
@@ -202,7 +207,12 @@ def calculate_ai_score_for_live(resume, vac_dict):
 
 JSON: {{"score":<0-100>,"relevant_experience_years":<float>,"explanation":"<1 предложение рус>","required_skills":["навык1",...]}}"""
 
-    client = Groq(api_key=api_key)
+    groq_kwargs = {'api_key': api_key}
+    groq_base_url = os.environ.get('GROQ_BASE_URL', '').strip()
+    if groq_base_url:
+        groq_kwargs['base_url'] = groq_base_url
+
+    client = Groq(**groq_kwargs)
     response = client.chat.completions.create(
         model='llama-3.1-8b-instant',
         messages=[
