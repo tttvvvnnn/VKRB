@@ -682,8 +682,8 @@ def calculate_match_live(resume, vac_dict):
     if ai_score is not None:
         exp_score = 1.0 if required_exp <= 0 else min(1.0, relevant_exp_years / required_exp)
         final_score = (
-            skill_data['score'] * 0.35 +
-            ai_score * 0.35 +
+            skill_data['score'] * 0.20 +
+            ai_score * 0.50 +
             exp_score * 0.20 +
             city_score * 0.10
         )
@@ -703,8 +703,8 @@ def calculate_match_live(resume, vac_dict):
         exp_score = calculate_experience_score(resume, proxy)
         text_score = calculate_text_similarity(resume, proxy)
         final_score = (
-            skill_data['score'] * 0.40 +
-            text_score * 0.35 +
+            skill_data['score'] * 0.20 +
+            text_score * 0.50 +
             exp_score * 0.20 +
             city_score * 0.05
         )
