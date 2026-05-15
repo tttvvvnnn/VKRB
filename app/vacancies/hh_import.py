@@ -107,14 +107,19 @@ def import_from_hh(query, area, count, owner):
             visibility=Vacancy.Visibility.PUBLIC,
         )
 
-        for skill_data in (detail.get('key_skills') or []):
-            skill_name = (skill_data.get('name') or '').strip()
-            if not skill_name:
-                continue
-            skill = Skill.objects.filter(name__iexact=skill_name).first()
-            if not skill:
-                skill = Skill.objects.create(name=skill_name)
-            vacancy.skill_tags.add(skill)
+        raw_skill_names = [
+            (s.get('name') or '').strip()
+            for s in (detail.get('key_skills') or [])
+            if (s.get('name') or '').strip()
+        ]
+        if raw_skill_names:
+            from matching.services import resolve_skills_to_db
+            resolved = resolve_skills_to_db(raw_skill_names, threshold=0.60)
+            for skill_name in (resolved or raw_skill_names):
+                skill = Skill.objects.filter(name__iexact=skill_name).first()
+                if not skill:
+                    skill = Skill.objects.create(name=skill_name)
+                vacancy.skill_tags.add(skill)
 
         imported.append(vacancy)
 

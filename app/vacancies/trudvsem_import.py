@@ -410,16 +410,21 @@ def import_from_trudvsem(query, region_code, count, owner):
                 visibility=Vacancy.Visibility.PUBLIC,
             )
 
-            seen = set()
+            raw_skill_names = []
+            seen_raw = set()
             for raw_skill in (item.get('skills') or []):
                 name = _clean_skill(raw_skill)
-                if not name or name.lower() in seen:
-                    continue
-                seen.add(name.lower())
-                skill = Skill.objects.filter(name__iexact=name).first()
-                if not skill:
-                    skill = Skill.objects.create(name=name)
-                vacancy.skill_tags.add(skill)
+                if name and name.lower() not in seen_raw:
+                    seen_raw.add(name.lower())
+                    raw_skill_names.append(name)
+            if raw_skill_names:
+                from matching.services import resolve_skills_to_db
+                resolved = resolve_skills_to_db(raw_skill_names, threshold=0.60)
+                for skill_name in (resolved or raw_skill_names):
+                    skill = Skill.objects.filter(name__iexact=skill_name).first()
+                    if not skill:
+                        skill = Skill.objects.create(name=skill_name)
+                    vacancy.skill_tags.add(skill)
 
             imported.append(vacancy)
             time.sleep(0.1)

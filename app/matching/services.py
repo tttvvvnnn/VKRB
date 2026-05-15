@@ -7,6 +7,49 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
 
+_skill_cache: dict = {'names': None, 'ts': 0.0}
+_SKILL_CACHE_TTL = 300  # seconds
+
+
+def _get_db_skill_names():
+    now = time.time()
+    if _skill_cache['names'] is None or now - _skill_cache['ts'] > _SKILL_CACHE_TTL:
+        from resumes.models import Skill
+        _skill_cache['names'] = list(Skill.objects.values_list('name', flat=True))
+        _skill_cache['ts'] = now
+    return _skill_cache['names']
+
+
+def resolve_skills_to_db(raw_names, threshold=0.52):
+    """Map raw skill strings to closest DB Skill names using char n-gram TF-IDF.
+
+    Returns a list of DB skill names (original case) for matched skills.
+    Unmatched skills are dropped — caller decides whether to keep or discard them.
+    """
+    if not raw_names:
+        return []
+    db_names = _get_db_skill_names()
+    if not db_names:
+        return list(raw_names)
+    try:
+        vectorizer = TfidfVectorizer(analyzer='char_wb', ngram_range=(2, 4))
+        vectorizer.fit(list(db_names) + list(raw_names))
+        db_matrix = vectorizer.transform(db_names)
+        raw_matrix = vectorizer.transform(raw_names)
+        sims = cosine_similarity(raw_matrix, db_matrix)
+        resolved, seen_lower = [], set()
+        for row in sims:
+            best_idx = int(row.argmax())
+            if row[best_idx] >= threshold:
+                name = db_names[best_idx]
+                if name.lower() not in seen_lower:
+                    seen_lower.add(name.lower())
+                    resolved.append(name)
+        return resolved
+    except Exception:
+        return list(raw_names)
+
+
 def normalize_text(value):
     if not value:
         return ''
@@ -556,7 +599,8 @@ class _VacancyProxy:
                 seen.add(cleaned.lower())
                 names.append(cleaned)
         self._seen_lower: set = seen
-        self.skill_tags = _SkillSetProxy(names)
+        resolved = resolve_skills_to_db(names) if names else []
+        self.skill_tags = _SkillSetProxy(resolved if resolved else names)
 
     def enrich_skills(self, extra_names: list[str]) -> None:
         """Add skill names returned by the AI into skill_tags (deduplicates)."""
