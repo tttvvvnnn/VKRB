@@ -336,6 +336,8 @@ def _compute_match(resume, vacancy):
     ai_score, ai_explanation, relevant_exp_years = None, '', None
     try:
         ai_score, ai_explanation, relevant_exp_years = calculate_ai_score(resume, vacancy)
+        if relevant_exp_years is not None and resume.experience_years:
+            relevant_exp_years = min(float(relevant_exp_years), float(resume.experience_years))
     except Exception as e:
         print(f'[Groq AI] Ошибка при вызове API: {e}', flush=True)
 
@@ -664,6 +666,9 @@ def calculate_match_live(resume, vac_dict):
     ai_score, ai_explanation, relevant_exp_years, ai_skills = None, '', None, []
     try:
         ai_score, ai_explanation, relevant_exp_years, ai_skills = calculate_ai_score_for_live(resume, vac_dict)
+        # AI can't give more relevant experience than the resume's total
+        if relevant_exp_years is not None and resume.experience_years:
+            relevant_exp_years = min(float(relevant_exp_years), float(resume.experience_years))
     except Exception as e:
         print(f'[Groq AI Live] Error: {e}', flush=True)
 
