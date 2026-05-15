@@ -234,7 +234,7 @@ JSON: {{"score":<0-100>,"relevant_experience_years":<float>,"explanation":"<1 п
     client = Groq(**groq_kwargs)
     response = _groq_chat(
         client,
-        model='gemma2-9b-it',
+        model='llama-3.1-8b-instant',
         messages=[
             {
                 'role': 'system',
