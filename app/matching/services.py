@@ -564,15 +564,6 @@ def build_explanation(score_percent, skill_data, text_score, experience_score, c
     return ' '.join(parts)
 
 
-def rank_vacancies_for_resume(resume, vacancies):
-    results = []
-    for vacancy in vacancies:
-        match_data = calculate_match(resume, vacancy)
-        match_data['vacancy'] = vacancy
-        results.append(match_data)
-    return sorted(results, key=lambda x: x['score'], reverse=True)
-
-
 def rank_resumes_for_vacancy(vacancy, resumes):
     results = []
     for resume in resumes:
