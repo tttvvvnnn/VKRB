@@ -349,8 +349,8 @@ def _compute_match(resume, vacancy):
             experience_score = min(1.0, relevant_exp_years / required_exp)
 
         final_score = (
-            skill_data['score'] * 0.35 +
-            ai_score * 0.35 +
+            skill_data['score'] * 0.20 +
+            ai_score * 0.50 +
             experience_score * 0.20 +
             city_score * 0.10
         )
@@ -363,17 +363,17 @@ def _compute_match(resume, vacancy):
             second_label='AI-оценка',
             experience_score=experience_score,
             city_score=city_score,
-            weights=(35, 35, 20, 10),
+            weights=(20, 50, 20, 10),
             experience_note=_experience_note(relevant_exp_years, required_exp),
         )
     else:
         experience_score = calculate_experience_score(resume, vacancy)
         text_score = calculate_text_similarity(resume, vacancy)
         final_score = (
-            skill_data['score'] * 0.40 +
-            text_score * 0.35 +
+            skill_data['score'] * 0.20 +
+            text_score * 0.50 +
             experience_score * 0.20 +
-            city_score * 0.05
+            city_score * 0.10
         )
         explanation = build_explanation(
             score_percent=round(final_score * 100, 2),
@@ -391,7 +391,7 @@ def _compute_match(resume, vacancy):
             second_label='Текстовое сходство',
             experience_score=experience_score,
             city_score=city_score,
-            weights=(40, 35, 20, 5),
+            weights=(20, 50, 20, 10),
         )
 
     score_percent = round(final_score * 100, 2)
@@ -429,7 +429,7 @@ def calculate_match(resume, vacancy):
                     second_label='AI-оценка',
                     experience_score=cached.experience_score_percent / 100,
                     city_score=cached.city_score_percent / 100,
-                    weights=(35, 35, 20, 10),
+                    weights=(20, 50, 20, 10),
                     experience_note=exp_note,
                 )
             else:
@@ -439,7 +439,7 @@ def calculate_match(resume, vacancy):
                     second_label='Текстовое сходство',
                     experience_score=cached.experience_score_percent / 100,
                     city_score=cached.city_score_percent / 100,
-                    weights=(40, 35, 20, 5),
+                    weights=(20, 50, 20, 10),
                 )
             return {
                 'score': cached.score,
@@ -693,7 +693,7 @@ def calculate_match_live(resume, vac_dict):
             second_label='AI-оценка',
             experience_score=exp_score,
             city_score=city_score,
-            weights=(35, 35, 20, 10),
+            weights=(20, 50, 20, 10),
             experience_note=_experience_note(relevant_exp_years, required_exp),
         )
         text_score_percent = round(ai_score * 100, 2)
@@ -718,7 +718,7 @@ def calculate_match_live(resume, vac_dict):
             second_label='Текстовое сходство',
             experience_score=exp_score,
             city_score=city_score,
-            weights=(40, 35, 20, 5),
+            weights=(20, 50, 20, 10),
         )
 
     score_percent = round(final_score * 100, 2)
@@ -749,10 +749,10 @@ def calculate_match_quick(resume, vac_dict):
     text_score = calculate_text_similarity(resume, proxy)
 
     final_score = (
-        skill_data['score'] * 0.40 +
-        text_score * 0.35 +
+        skill_data['score'] * 0.20 +
+        text_score * 0.50 +
         experience_score * 0.20 +
-        city_score * 0.05
+        city_score * 0.10
     )
     score_percent = round(final_score * 100, 2)
     return {
@@ -775,6 +775,6 @@ def calculate_match_quick(resume, vac_dict):
             second_label='Текстовое сходство',
             experience_score=experience_score,
             city_score=city_score,
-            weights=(40, 35, 20, 5),
+            weights=(20, 50, 20, 10),
         ),
     }
