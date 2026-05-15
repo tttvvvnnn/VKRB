@@ -1,6 +1,7 @@
 import json
 import os
 import re
+import time
 
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
@@ -91,6 +92,23 @@ def calculate_city_score(resume, vacancy):
     return 1.0 if resume_city == vacancy_city else 0.0
 
 
+def _groq_chat(client, max_retries=3, **kwargs):
+    for attempt in range(max_retries):
+        try:
+            return client.chat.completions.create(**kwargs)
+        except Exception as e:
+            msg = str(e)
+            if '429' in msg:
+                wait = 5.0
+                m = re.search(r'try again in ([\d.]+)s', msg)
+                if m:
+                    wait = float(m.group(1)) + 0.5
+                time.sleep(wait)
+                continue
+            raise
+    return client.chat.completions.create(**kwargs)
+
+
 def calculate_ai_score(resume, vacancy):
     api_key = os.environ.get('GROQ_API_KEY', '').strip()
     if not api_key:
@@ -127,7 +145,8 @@ def calculate_ai_score(resume, vacancy):
         groq_kwargs['base_url'] = groq_base_url
 
     client = Groq(**groq_kwargs)
-    response = client.chat.completions.create(
+    response = _groq_chat(
+        client,
         model='llama-3.3-70b-versatile',
         messages=[
             {
@@ -213,7 +232,8 @@ JSON: {{"score":<0-100>,"relevant_experience_years":<float>,"explanation":"<1 п
         groq_kwargs['base_url'] = groq_base_url
 
     client = Groq(**groq_kwargs)
-    response = client.chat.completions.create(
+    response = _groq_chat(
+        client,
         model='llama-3.1-8b-instant',
         messages=[
             {
