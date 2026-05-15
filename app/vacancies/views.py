@@ -372,17 +372,8 @@ def trudvsem_vacancy_detail_view(request, vac_id):
         except Exception as e:
             error = str(e)
 
-    match_results = []
     if item:
         vacancy = format_vacancy_detail(item)
-        for resume in ResumeModel.objects.filter(owner=request.user).prefetch_related('skill_tags'):
-            try:
-                md = calculate_match_quick(resume, item)
-                md['resume'] = resume
-                match_results.append(md)
-            except Exception:
-                pass
-        match_results.sort(key=lambda x: x['score'], reverse=True)
     elif not error:
         error = 'Вакансия не найдена. Вернитесь в список и откройте её снова.'
 
@@ -392,7 +383,6 @@ def trudvsem_vacancy_detail_view(request, vac_id):
         'vacancy': vacancy,
         'error': error,
         'vac_id': vac_id,
-        'match_results': match_results,
         'is_favorited': is_favorited,
         'user_resumes': user_resumes,
     })
@@ -549,6 +539,8 @@ def ai_score_vacancy(request, pk):
     resume_pk = request.POST.get('resume_id')
     resume = get_object_or_404(Resume, pk=resume_pk, owner=request.user)
     try:
+        from matching.services import calculate_skill_score
+        skill_data = calculate_skill_score(resume, vacancy)
         score, explanation, relevant_exp = calculate_ai_score(resume, vacancy)
         if score is None:
             return JsonResponse({'error': 'Groq AI недоступен (нет ключа)'}, status=503)
@@ -556,6 +548,8 @@ def ai_score_vacancy(request, pk):
             'score_percent': round(score * 100),
             'explanation': explanation,
             'relevant_experience_years': relevant_exp,
+            'matched_skills': skill_data['matched_skills'],
+            'missing_skills': skill_data['missing_skills'],
         })
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
@@ -578,6 +572,8 @@ def ai_score_trudvsem(request, vac_id):
     if not vac_dict:
         return JsonResponse({'error': 'Данные вакансии не найдены, откройте её снова'}, status=404)
     try:
+        from matching.services import calculate_match_quick
+        skill_data = calculate_match_quick(resume, vac_dict)
         score, explanation, relevant_exp, _ = calculate_ai_score_for_live(resume, vac_dict)
         if score is None:
             return JsonResponse({'error': 'Groq AI недоступен (нет ключа)'}, status=503)
@@ -585,6 +581,8 @@ def ai_score_trudvsem(request, vac_id):
             'score_percent': round(score * 100),
             'explanation': explanation,
             'relevant_experience_years': relevant_exp,
+            'matched_skills': skill_data['matched_skills'],
+            'missing_skills': skill_data['missing_skills'],
         })
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)

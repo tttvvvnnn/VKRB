@@ -153,57 +153,6 @@
         </div>
         {% endif %}
 
-        {% if match_results %}
-        <div class="card mt-3" style="border-radius:12px;">
-            <div class="card-header d-flex align-items-center gap-2" style="font-size:0.85rem;">
-                <i class="bi bi-stars" style="color:var(--accent);"></i>
-                Соответствие резюме
-            </div>
-            <div class="card-body p-0">
-                {% for item in match_results %}
-                <div class="d-flex align-items-center gap-3 px-3 py-2
-                    {% if not forloop.last %}border-bottom{% endif %}"
-                    style="font-size:0.82rem;">
-                    <div style="
-                        width:46px;height:46px;border-radius:50%;flex-shrink:0;
-                        display:flex;flex-direction:column;align-items:center;justify-content:center;
-                        font-weight:700;border:2px solid;
-                        {% if item.progress_percent >= 70 %}border-color:var(--success);color:var(--success);background:rgba(16,185,129,0.1);
-                        {% elif item.progress_percent >= 40 %}border-color:var(--warning);color:var(--warning);background:rgba(245,158,11,0.08);
-                        {% else %}border-color:var(--danger);color:var(--danger);background:rgba(239,68,68,0.08);{% endif %}">
-                        <span style="font-size:0.95rem;line-height:1;">{{ item.score_percent|floatformat:0 }}</span>
-                        <span style="font-size:0.55rem;opacity:0.8;">б.</span>
-                    </div>
-                    <div class="flex-grow-1 min-w-0">
-                        <div class="fw-600 text-truncate">{{ item.resume.title }}</div>
-                        {% if item.matched_skills %}
-                        <div class="d-flex flex-wrap gap-1 mt-1">
-                            {% for skill in item.matched_skills|slice:":4" %}
-                            <span class="badge bg-success" style="font-size:0.65rem;">{{ skill }}</span>
-                            {% endfor %}
-                            {% if item.missing_skills %}
-                            {% for skill in item.missing_skills|slice:":2" %}
-                            <span class="badge bg-secondary" style="font-size:0.65rem;">{{ skill }}</span>
-                            {% endfor %}
-                            {% endif %}
-                        </div>
-                        {% endif %}
-                        {% if item.explanation %}
-                        <div class="text-muted mt-1" style="font-size:0.75rem;font-style:italic;line-height:1.35;">
-                            {{ item.explanation }}
-                        </div>
-                        {% endif %}
-                    </div>
-                    <a href="{% url 'match_trudvsem' item.resume.pk %}"
-                       class="btn btn-sm btn-outline-primary flex-shrink-0"
-                       style="font-size:0.75rem;">
-                        Поиск
-                    </a>
-                </div>
-                {% endfor %}
-            </div>
-        </div>
-        {% endif %}
     </div>
 
     <div class="col-lg-8 d-flex flex-column gap-3">
@@ -275,15 +224,20 @@ function requestAiScore() {
             } else {
                 const pct = data.score_percent;
                 const color = pct >= 70 ? 'var(--success)' : pct >= 40 ? 'var(--warning)' : 'var(--danger)';
+                const skills = [
+                    ...(data.matched_skills||[]).map(s=>`<span class="badge bg-success" style="font-size:0.7rem;">${s}</span>`),
+                    ...(data.missing_skills||[]).map(s=>`<span class="badge bg-secondary" style="font-size:0.7rem;">${s}</span>`),
+                ].join('');
                 result.innerHTML = `
-                <div class="d-flex align-items-center gap-3">
+                <div class="d-flex align-items-start gap-3">
                     <div style="width:56px;height:56px;border-radius:50%;border:3px solid ${color};color:${color};
                         display:flex;flex-direction:column;align-items:center;justify-content:center;font-weight:700;flex-shrink:0;">
                         <span style="font-size:1.1rem;line-height:1;">${pct}</span>
                         <span style="font-size:0.6rem;">балл</span>
                     </div>
                     <div>
-                        <div style="font-size:0.875rem;">${data.explanation || ''}</div>
+                        ${skills ? `<div class="d-flex flex-wrap gap-1 mb-2">${skills}</div>` : ''}
+                        <div style="font-size:0.875rem;font-style:italic;">${data.explanation || ''}</div>
                         ${data.relevant_experience_years ? `<div class="text-muted mt-1" style="font-size:0.8rem;">Релевантный опыт: ${data.relevant_experience_years} лет</div>` : ''}
                     </div>
                 </div>`;

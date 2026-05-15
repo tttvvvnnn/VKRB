@@ -239,15 +239,20 @@ function requestAiScore() {
             } else {
                 const pct = data.score_percent;
                 const color = pct >= 70 ? 'var(--success)' : pct >= 40 ? 'var(--warning)' : 'var(--danger)';
+                const skills = [
+                    ...(data.matched_skills||[]).map(s=>`<span class="badge bg-success" style="font-size:0.7rem;">${s}</span>`),
+                    ...(data.missing_skills||[]).map(s=>`<span class="badge bg-secondary" style="font-size:0.7rem;">${s}</span>`),
+                ].join('');
                 result.innerHTML = `
-                <div class="d-flex align-items-center gap-3">
+                <div class="d-flex align-items-start gap-3">
                     <div style="width:56px;height:56px;border-radius:50%;border:3px solid ${color};color:${color};
                         display:flex;flex-direction:column;align-items:center;justify-content:center;font-weight:700;flex-shrink:0;">
                         <span style="font-size:1.1rem;line-height:1;">${pct}</span>
                         <span style="font-size:0.6rem;">балл</span>
                     </div>
                     <div>
-                        <div style="font-size:0.875rem;">${data.explanation || ''}</div>
+                        ${skills ? `<div class="d-flex flex-wrap gap-1 mb-2">${skills}</div>` : ''}
+                        <div style="font-size:0.875rem;font-style:italic;">${data.explanation || ''}</div>
                         ${data.relevant_experience_years ? `<div class="text-muted mt-1" style="font-size:0.8rem;">Релевантный опыт: ${data.relevant_experience_years} лет</div>` : ''}
                     </div>
                 </div>`;
