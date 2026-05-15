@@ -116,6 +116,8 @@ def import_from_hh(query, area, count, owner):
             from matching.services import resolve_skills_to_db
             resolved = resolve_skills_to_db(raw_skill_names, threshold=0.60)
             for skill_name in (resolved or raw_skill_names):
+                if len(skill_name) > 35 or skill_name.count(' ') > 4:
+                    continue
                 skill = Skill.objects.filter(name__iexact=skill_name).first()
                 if not skill:
                     skill = Skill.objects.create(name=skill_name)

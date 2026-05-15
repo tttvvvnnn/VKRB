@@ -11,11 +11,16 @@ _skill_cache: dict = {'names': None, 'ts': 0.0}
 _SKILL_CACHE_TTL = 300  # seconds
 
 
+def _is_clean_skill(name):
+    return len(name) <= 35 and name.count(' ') <= 4
+
+
 def _get_db_skill_names():
     now = time.time()
     if _skill_cache['names'] is None or now - _skill_cache['ts'] > _SKILL_CACHE_TTL:
         from resumes.models import Skill
-        _skill_cache['names'] = list(Skill.objects.values_list('name', flat=True))
+        all_names = Skill.objects.values_list('name', flat=True)
+        _skill_cache['names'] = [n for n in all_names if _is_clean_skill(n)]
         _skill_cache['ts'] = now
     return _skill_cache['names']
 
@@ -635,7 +640,7 @@ class _VacancyProxy:
                 merged.append(s)
 
         self._seen_lower: set = merged_lower
-        self.skill_tags = _SkillSetProxy(merged if merged else names)
+        self.skill_tags = _SkillSetProxy(merged)
 
     def enrich_skills(self, extra_names: list[str]) -> None:
         """Add skill names returned by the AI into skill_tags (deduplicates)."""

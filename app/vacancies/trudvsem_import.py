@@ -162,11 +162,30 @@ def format_live_item(item):
     salary_min = item.get('salary_min')
     salary_max = item.get('salary_max')
     skills_raw = list(set(item.get('skills') or []))
-    skills = [_clean_skill(s) for s in skills_raw if s]
-    skills = [s for s in skills if s][:8]
+    api_skills = [_clean_skill(s) for s in skills_raw if s]
+    api_skills = [s for s in api_skills if s]
+
+    title  = (item.get('job-name') or '').strip()
+    duty   = (item.get('duty') or '').strip()
+    req    = (item.get('requirements') or '').strip()
+
+    try:
+        from matching.services import extract_skills_from_text, resolve_skills_to_db
+        resolved = resolve_skills_to_db(api_skills, threshold=0.55) if api_skills else []
+        text_skills = extract_skills_from_text(f'{title} {duty} {req}')
+        seen = {s.lower() for s in resolved}
+        merged = list(resolved)
+        for s in text_skills:
+            if s.lower() not in seen:
+                seen.add(s.lower())
+                merged.append(s)
+        skills = merged[:12]
+    except Exception:
+        skills = api_skills[:8]
+
     return {
         'id':          _vac_uid(item),
-        'title':       (item.get('job-name') or '').strip(),
+        'title':       title,
         'company':     ((item.get('company') or {}).get('name') or '').strip(),
         'city':        city,
         'salary_from': int(salary_min) if salary_min else None,
@@ -174,7 +193,7 @@ def format_live_item(item):
         'employment':  (item.get('employment') or '').strip(),
         'experience':  requirement.get('experience', 0),
         'source_url':  (item.get('vac_url') or '').strip(),
-        'description': (item.get('duty') or '')[:300].strip(),
+        'description': duty[:300],
         'skills':      skills,
     }
 
@@ -421,6 +440,8 @@ def import_from_trudvsem(query, region_code, count, owner):
                 from matching.services import resolve_skills_to_db
                 resolved = resolve_skills_to_db(raw_skill_names, threshold=0.60)
                 for skill_name in (resolved or raw_skill_names):
+                    if len(skill_name) > 35 or skill_name.count(' ') > 4:
+                        continue
                     skill = Skill.objects.filter(name__iexact=skill_name).first()
                     if not skill:
                         skill = Skill.objects.create(name=skill_name)
