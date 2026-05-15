@@ -20,6 +20,26 @@ def _get_db_skill_names():
     return _skill_cache['names']
 
 
+def extract_skills_from_text(text):
+    """Find DB skill names mentioned in free text via word-boundary search."""
+    if not text:
+        return []
+    db_names = _get_db_skill_names()
+    if not db_names:
+        return []
+    text_lower = text.lower()
+    found, seen_lower = [], set()
+    for name in db_names:
+        nl = name.lower()
+        if nl in seen_lower or len(name) < 2:
+            continue
+        pattern = r'(?<![a-zA-Zа-яА-Я0-9])' + re.escape(nl) + r'(?![a-zA-Zа-яА-Я0-9])'
+        if re.search(pattern, text_lower):
+            seen_lower.add(nl)
+            found.append(name)
+    return found
+
+
 def resolve_skills_to_db(raw_names, threshold=0.52):
     """Map raw skill strings to closest DB Skill names using char n-gram TF-IDF.
 
@@ -598,9 +618,24 @@ class _VacancyProxy:
             if cleaned and cleaned.lower() not in seen:
                 seen.add(cleaned.lower())
                 names.append(cleaned)
-        self._seen_lower: set = seen
+
+        # Map API skills to DB skills via TF-IDF
         resolved = resolve_skills_to_db(names) if names else []
-        self.skill_tags = _SkillSetProxy(resolved if resolved else names)
+
+        # Extract skills mentioned in vacancy text
+        vacancy_text = ' '.join(filter(None, [self.title, self.description, self.requirements]))
+        text_skills = extract_skills_from_text(vacancy_text)
+
+        # Merge: DB-resolved API skills + text-extracted skills
+        merged, merged_lower = [], {s.lower() for s in resolved}
+        merged.extend(resolved)
+        for s in text_skills:
+            if s.lower() not in merged_lower:
+                merged_lower.add(s.lower())
+                merged.append(s)
+
+        self._seen_lower: set = merged_lower
+        self.skill_tags = _SkillSetProxy(merged if merged else names)
 
     def enrich_skills(self, extra_names: list[str]) -> None:
         """Add skill names returned by the AI into skill_tags (deduplicates)."""
