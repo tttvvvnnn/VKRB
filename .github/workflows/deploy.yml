@@ -19,4 +19,4 @@ jobs:
 
       - name: Deploy
         run: |
-          ssh root@${{ secrets.VPS_HOST }} "cd /opt/vkrb && git pull origin master && docker compose up -d --build && docker compose exec -T web python manage.py migrate"
+          ssh root@${{ secrets.VPS_HOST }} "cd /opt/vkrb && git pull origin master && docker compose up -d --build && docker compose restart nginx && docker compose exec -T web python manage.py migrate"
