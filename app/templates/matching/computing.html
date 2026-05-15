@@ -147,6 +147,7 @@
     let cardIdx = 0;
     function renderVacancyCard(r) {
         const idx = cardIdx++;
+        const detailUrl = r.detail_url || '/vacancies/' + r.pk + '/';
         const salary = (r.salary_from || r.salary_to)
             ? `<span style="color:var(--success);font-size:0.8rem;">
                 <i class="bi bi-currency-dollar"></i>
@@ -175,7 +176,7 @@
               <div class="flex-grow-1">
                 <div class="d-flex align-items-center gap-2 mb-1">
                   <h3 class="h6 mb-0">
-                    <a href="/vacancies/${r.pk}/" style="color:var(--text);">${r.title}</a>
+                    <a href="${detailUrl}" style="color:var(--text);">${r.title}</a>
                   </h3>
                   ${aiBadge}
                 </div>
@@ -195,7 +196,7 @@
                           data-bs-toggle="collapse" data-bs-target="#bd-${idx}">
                     <i class="bi bi-bar-chart me-1"></i>Разбивка оценки
                   </button>
-                  <a href="/vacancies/${r.pk}/" class="btn btn-sm btn-outline-primary">Открыть</a>
+                  <a href="${detailUrl}" class="btn btn-sm btn-outline-primary">Открыть</a>
                   ${sourceLink}
                   ${salary}
                 </div>
@@ -256,7 +257,7 @@
         </div>`;
     }
 
-    const renderCard = MODE === 'vacancy' ? renderVacancyCard : renderResumeCard;
+    const renderCard = MODE === 'resume' ? renderResumeCard : renderVacancyCard;
 
     // ── Re-render sorted results (skip 0%) ────────────────────────────────────
     function renderAll(results) {

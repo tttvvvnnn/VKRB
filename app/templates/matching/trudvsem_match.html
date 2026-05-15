@@ -1,0 +1,253 @@
+{% extends 'base.html' %}
+
+{% block title %}Подбор вакансий Труд Всем — TalentMatch{% endblock %}
+
+{% block extra_css %}
+.filter-label {
+    font-size: 0.72rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.07em;
+    color: var(--text-muted); margin-bottom: 0.5rem; display: block;
+}
+.filter-section { border-bottom: 1px solid var(--border); padding-bottom: 1rem; margin-bottom: 1rem; }
+.filter-section:last-child { border-bottom: none; margin-bottom: 0; padding-bottom: 0; }
+.check-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 0.35rem; }
+.check-list li label {
+    display: flex; align-items: center; gap: 0.5rem;
+    cursor: pointer; font-size: 0.875rem; color: var(--text-muted); transition: color 0.15s;
+}
+.check-list li label:hover { color: var(--text); }
+.check-list input[type=checkbox] { accent-color: var(--accent); width: 15px; height: 15px; flex-shrink: 0; }
+.sidebar-sticky { position: sticky; top: 80px; max-height: calc(100vh - 100px); overflow-y: auto; }
+.sidebar-sticky::-webkit-scrollbar { width: 3px; }
+.sidebar-sticky::-webkit-scrollbar-thumb { background: var(--border); }
+{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center gap-3 mb-4">
+    <a href="{% url 'matching_dashboard' %}" class="btn btn-sm btn-outline-secondary">
+        <i class="bi bi-arrow-left"></i>
+    </a>
+    <div>
+        <h1 class="h4 mb-0">Подбор вакансий с Труд Всем</h1>
+        <p class="text-muted mb-0" style="font-size:0.85rem;">
+            Резюме: <strong style="color:var(--text);">{{ resume.title }}</strong>
+        </p>
+    </div>
+</div>
+
+{% if messages %}
+{% for msg in messages %}
+<div class="alert alert-{{ msg.tags|default:'info' }} alert-dismissible mb-3">
+    {{ msg }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+</div>
+{% endfor %}
+{% endif %}
+
+<form method="post" id="search-form">
+{% csrf_token %}
+<div class="row g-4 align-items-start">
+
+    <!-- ── Sidebar filters ───────────────────────────────────────── -->
+    <div class="col-lg-3">
+        <div class="card sidebar-sticky" style="border-radius:12px;">
+            <div class="card-header">
+                <i class="bi bi-funnel me-2"></i>Фильтры
+            </div>
+            <div class="card-body p-3">
+
+                <!-- Поиск -->
+                <div class="filter-section">
+                    <span class="filter-label"><i class="bi bi-search me-1"></i>Поиск</span>
+                    <input type="text" name="query" class="form-control"
+                           placeholder="Python разработчик, аналитик…"
+                           value="{{ post.query|default:'' }}">
+                </div>
+
+                <!-- Регион -->
+                <div class="filter-section">
+                    <span class="filter-label"><i class="bi bi-geo-alt me-1"></i>Регион</span>
+                    <select name="region_code" class="form-select" style="font-size:0.85rem;">
+                        {% for code, name in regions %}
+                        <option value="{{ code }}"
+                            {% if post.region_code == code %}selected{% endif %}>
+                            {{ name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <!-- Тип занятости -->
+                <div class="filter-section">
+                    <span class="filter-label"><i class="bi bi-clock me-1"></i>Тип занятости</span>
+                    <ul class="check-list">
+                        <li><label>
+                            <input type="checkbox" name="schedule" value="full_time"
+                                {% if 'full_time' in post.getlist|default:'' %}checked{% endif %}>
+                            Полная занятость
+                        </label></li>
+                        <li><label>
+                            <input type="checkbox" name="schedule" value="remote"
+                                {% if 'remote' in post.getlist|default:'' %}checked{% endif %}>
+                            Удалённая работа
+                        </label></li>
+                        <li><label>
+                            <input type="checkbox" name="schedule" value="part_time"
+                                {% if 'part_time' in post.getlist|default:'' %}checked{% endif %}>
+                            Частичная занятость
+                        </label></li>
+                        <li><label>
+                            <input type="checkbox" name="schedule" value="internship"
+                                {% if 'internship' in post.getlist|default:'' %}checked{% endif %}>
+                            Стажировка
+                        </label></li>
+                    </ul>
+                </div>
+
+                <!-- Опыт -->
+                <div class="filter-section">
+                    <span class="filter-label"><i class="bi bi-briefcase me-1"></i>Максимальный требуемый опыт</span>
+                    <select name="exp_max" class="form-select" style="font-size:0.85rem;">
+                        <option value="">Любой опыт</option>
+                        <option value="0" {% if post.exp_max == '0' %}selected{% endif %}>Без опыта</option>
+                        <option value="1" {% if post.exp_max == '1' %}selected{% endif %}>До 1 года</option>
+                        <option value="3" {% if post.exp_max == '3' %}selected{% endif %}>До 3 лет</option>
+                        <option value="6" {% if post.exp_max == '6' %}selected{% endif %}>До 6 лет</option>
+                    </select>
+                </div>
+
+                <!-- Зарплата -->
+                <div class="filter-section">
+                    <span class="filter-label"><i class="bi bi-currency-dollar me-1"></i>Зарплата (₽)</span>
+                    <div class="d-flex gap-2 align-items-center">
+                        <input type="number" name="salary_min" class="form-control" min="0"
+                               placeholder="от" style="font-size:0.85rem;"
+                               value="{{ post.salary_min|default:'' }}">
+                        <span class="text-muted" style="font-size:0.8rem;">—</span>
+                        <input type="number" name="salary_max" class="form-control" min="0"
+                               placeholder="до" style="font-size:0.85rem;"
+                               value="{{ post.salary_max|default:'' }}">
+                    </div>
+                </div>
+
+                <!-- Количество -->
+                <div class="filter-section">
+                    <span class="filter-label"><i class="bi bi-list-ol me-1"></i>Вакансий для анализа</span>
+                    <select name="count" class="form-select" style="font-size:0.85rem;">
+                        <option value="10" {% if post.count == '10' %}selected{% endif %}>10 (быстро)</option>
+                        <option value="20" {% if not post.count or post.count == '20' %}selected{% endif %}>20</option>
+                        <option value="35" {% if post.count == '35' %}selected{% endif %}>35</option>
+                        <option value="50" {% if post.count == '50' %}selected{% endif %}>50 (медленнее)</option>
+                    </select>
+                </div>
+
+                <button type="submit" class="btn btn-primary w-100">
+                    <i class="bi bi-stars me-2"></i>Найти и сопоставить
+                </button>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Main area ─────────────────────────────────────────────── -->
+    <div class="col-lg-9">
+
+        <div class="card" style="border-radius:12px;">
+            <div class="card-header d-flex align-items-center gap-2">
+                <i class="bi bi-globe" style="color:var(--accent);"></i>
+                Как работает подбор
+            </div>
+            <div class="card-body" style="font-size:0.875rem;">
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <div class="d-flex gap-2 align-items-start">
+                            <div style="width:28px;height:28px;border-radius:50%;background:rgba(99,102,241,0.15);
+                                        display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                                <span style="font-size:0.75rem;font-weight:700;color:var(--accent);">1</span>
+                            </div>
+                            <div>
+                                <div class="fw-600 mb-1" style="font-size:0.82rem;">Поиск на Труд Всем</div>
+                                <div class="text-muted" style="font-size:0.78rem;">
+                                    Система получает вакансии по вашим параметрам из государственного портала в реальном времени
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="d-flex gap-2 align-items-start">
+                            <div style="width:28px;height:28px;border-radius:50%;background:rgba(99,102,241,0.15);
+                                        display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                                <span style="font-size:0.75rem;font-weight:700;color:var(--accent);">2</span>
+                            </div>
+                            <div>
+                                <div class="fw-600 mb-1" style="font-size:0.82rem;">AI-анализ текста</div>
+                                <div class="text-muted" style="font-size:0.78rem;">
+                                    Groq Llama анализирует каждую вакансию, даже если текст неструктурированный
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="d-flex gap-2 align-items-start">
+                            <div style="width:28px;height:28px;border-radius:50%;background:rgba(99,102,241,0.15);
+                                        display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                                <span style="font-size:0.75rem;font-weight:700;color:var(--accent);">3</span>
+                            </div>
+                            <div>
+                                <div class="fw-600 mb-1" style="font-size:0.82rem;">Рейтинг</div>
+                                <div class="text-muted" style="font-size:0.78rem;">
+                                    Вакансии сортируются по релевантности вашему резюме с объяснением каждой оценки
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Resume preview -->
+        <div class="card mt-3" style="border-radius:12px;">
+            <div class="card-header" style="font-size:0.85rem;">
+                <i class="bi bi-file-person me-2"></i>Резюме для сопоставления
+            </div>
+            <div class="card-body d-flex align-items-center gap-3" style="font-size:0.875rem;">
+                <div class="flex-grow-1">
+                    <div class="fw-600">{{ resume.title }}</div>
+                    <div class="text-muted" style="font-size:0.8rem;">
+                        {{ resume.desired_position }}
+                        {% if resume.city %} · {{ resume.city }}{% endif %}
+                        {% if resume.experience_years %} · {{ resume.experience_years }} лет опыта{% endif %}
+                    </div>
+                    {% if resume.skill_tags.all %}
+                    <div class="d-flex flex-wrap gap-1 mt-2">
+                        {% for skill in resume.skill_tags.all|slice:":8" %}
+                        <span class="badge bg-primary" style="font-size:0.7rem;">{{ skill.name }}</span>
+                        {% endfor %}
+                        {% if resume.skill_tags.count > 8 %}
+                        <span class="badge bg-secondary" style="font-size:0.7rem;">+{{ resume.skill_tags.count|add:"-8" }}</span>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                </div>
+                <a href="{% url 'resume_detail' resume.pk %}" class="btn btn-sm btn-outline-secondary">
+                    <i class="bi bi-eye me-1"></i>Открыть
+                </a>
+            </div>
+        </div>
+
+        <div class="card mt-3" style="border-radius:12px;border-color:rgba(99,102,241,0.25);">
+            <div class="card-body text-center py-4">
+                <i class="bi bi-stars" style="font-size:2rem;color:var(--accent);opacity:0.7;"></i>
+                <p class="text-muted mt-2 mb-3" style="font-size:0.875rem;">
+                    Настройте фильтры слева и нажмите кнопку для запуска AI-анализа
+                </p>
+                <button type="submit" class="btn btn-primary btn-lg">
+                    <i class="bi bi-stars me-2"></i>Найти и сопоставить
+                </button>
+            </div>
+        </div>
+
+    </div>
+</div>
+</form>
+{% endblock %}

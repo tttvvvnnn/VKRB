@@ -348,8 +348,10 @@ def application_status_update_view(request, pk, status):
 @login_required
 def trudvsem_vacancy_detail_view(request, vac_id):
     import logging
-    from .trudvsem_import import fetch_vacancy, format_vacancy_detail
     from django.core.cache import cache
+    from matching.services import calculate_match_quick
+    from resumes.models import Resume as ResumeModel
+    from .trudvsem_import import fetch_vacancy, format_vacancy_detail
 
     log = logging.getLogger(__name__)
     error = None
@@ -366,8 +368,17 @@ def trudvsem_vacancy_detail_view(request, vac_id):
         except Exception as e:
             error = str(e)
 
+    match_results = []
     if item:
         vacancy = format_vacancy_detail(item)
+        for resume in ResumeModel.objects.filter(owner=request.user).prefetch_related('skill_tags'):
+            try:
+                md = calculate_match_quick(resume, item)
+                md['resume'] = resume
+                match_results.append(md)
+            except Exception:
+                pass
+        match_results.sort(key=lambda x: x['score'], reverse=True)
     elif not error:
         error = 'Вакансия не найдена. Вернитесь в список и откройте её снова.'
 
@@ -375,6 +386,7 @@ def trudvsem_vacancy_detail_view(request, vac_id):
         'vacancy': vacancy,
         'error': error,
         'vac_id': vac_id,
+        'match_results': match_results,
     })
 
 

@@ -1,5 +1,6 @@
 import hashlib
 import json
+import re
 import ssl
 import time
 import urllib.parse
@@ -62,7 +63,13 @@ SCHEDULE_RU_TO_TYPE = {
     'гибкий график':     'part_time',
 }
 
-SKILL_PREFIX = 'навык работы с '
+_SKILL_PREFIXES = (
+    'навык работы с ',
+    'знание ',
+    'владение ',
+    'умение работать с ',
+    'опыт работы с ',
+)
 
 
 def _vac_uid(item):
@@ -218,9 +225,126 @@ def format_vacancy_detail(item):
 
 def _clean_skill(raw):
     name = raw.strip()
-    if name.lower().startswith(SKILL_PREFIX):
-        name = name[len(SKILL_PREFIX):]
+    name_lower = name.lower()
+
+    for prefix in _SKILL_PREFIXES:
+        if name_lower.startswith(prefix):
+            name = name[len(prefix):]
+            break
+
+    # "Python / Питон" → "Python"
+    if ' / ' in name:
+        name = name.split(' / ')[0]
+
+    # "PostgreSQL (Postgres)" → "PostgreSQL"
+    name = re.sub(r'\s*\([^)]*\)\s*$', '', name)
+
     return name.strip(' /').strip()
+
+
+# ── Vacancy text structure parsing ────────────────────────────────────────────
+
+# Known Russian HR section headers → section type (lowercase keys)
+_SECTION_MAP: dict[str, str] = {
+    # duties
+    'обязанности': 'duty', 'задачи': 'duty', 'функционал': 'duty',
+    'функции': 'duty', 'что предстоит делать': 'duty', 'что нужно делать': 'duty',
+    'ваши задачи': 'duty', 'основные задачи': 'duty', 'задачи и функции': 'duty',
+    'задачи которые предстоит решать': 'duty',
+    # requirements
+    'требования': 'requirements', 'что нужно': 'requirements',
+    'необходимо': 'requirements', 'от кандидата': 'requirements',
+    'пожелания': 'requirements', 'ожидания': 'requirements',
+    'требования к кандидату': 'requirements', 'профиль кандидата': 'requirements',
+    'ваши навыки': 'requirements', 'мы ожидаем': 'requirements',
+    'для нас важно': 'requirements', 'мы от вас ожидаем': 'requirements',
+    'что мы ожидаем': 'requirements', 'пожелания к кандидату': 'requirements',
+    'будет плюсом': 'requirements', 'будет преимуществом': 'requirements',
+    # conditions
+    'условия': 'conditions', 'мы предлагаем': 'conditions',
+    'что предлагаем': 'conditions', 'предлагаем': 'conditions',
+    'мы гарантируем': 'conditions', 'предоставляем': 'conditions',
+    'условия работы': 'conditions', 'что мы предлагаем': 'conditions',
+}
+
+# Pattern 1 — headers on their own line (e.g. "Требования:" or "ТРЕБОВАНИЯ")
+_LINE_HEADER_RE = re.compile(
+    r'(?im)^[ \t]*(' + '|'.join(re.escape(k) for k in _SECTION_MAP) + r')[ \t]*:?[ \t]*$'
+)
+
+# Pattern 2 — headers inline in semicolon/newline-separated text
+# Matches "HEADER:" or "; HEADER:" or ". HEADER:" anywhere in text
+_INLINE_HEADER_RE = re.compile(
+    r'(?:^|[;.\n])[ \t]*(' + '|'.join(re.escape(k) for k in _SECTION_MAP) + r')[ \t]*:',
+    re.IGNORECASE,
+)
+
+
+def parse_vacancy_sections(text):
+    """
+    Split Russian vacancy text into {duty, requirements, conditions} sections.
+    Handles both line-based headers and inline (semicolon-separated) formats.
+    Returns a dict with keys that were found; empty dict if no structure detected.
+    """
+    if not text:
+        return {}
+
+    # Try line-based approach first
+    matches = list(_LINE_HEADER_RE.finditer(text))
+    if not matches:
+        # Fall back to inline approach
+        matches = list(_INLINE_HEADER_RE.finditer(text))
+
+    if not matches:
+        return {}
+
+    sections: dict[str, str] = {}
+    for i, m in enumerate(matches):
+        key = m.group(1).strip().lower()
+        sec = _SECTION_MAP.get(key)
+        if not sec:
+            continue
+        start = m.end()
+        end = matches[i + 1].start() if i + 1 < len(matches) else len(text)
+        content = text[start:end].strip().strip(';').strip()
+        if content:
+            sections[sec] = (sections.get(sec, '') + '\n' + content).strip()
+
+    return sections
+
+
+def enrich_vac_dict(vac_dict):
+    """
+    Return a copy of a raw Труд Всем dict with better-structured fields.
+    Tries to split the `duty` blob into duty/requirements/conditions sections.
+    When no structure is detected, copies duty text into requirements so the
+    matching AI always has context to work with.
+    """
+    enriched = dict(vac_dict)
+    duty = (vac_dict.get('duty') or '').strip()
+    has_reqs = bool((vac_dict.get('requirements') or '').strip())
+
+    if not duty:
+        return enriched
+
+    sections = parse_vacancy_sections(duty)
+
+    if sections:
+        if 'duty' in sections:
+            enriched['duty'] = sections['duty']
+        if 'requirements' in sections:
+            enriched['requirements'] = (
+                ((vac_dict.get('requirements') or '') + '\n' + sections['requirements']).strip()
+                if has_reqs else sections['requirements']
+            )
+        if 'conditions' in sections and not (vac_dict.get('benefit') or '').strip():
+            enriched['benefit'] = sections['conditions']
+    elif not has_reqs:
+        # No section headers found and requirements is empty:
+        # put the full duty text in requirements so AI sees the full context.
+        enriched['requirements'] = duty
+
+    return enriched
 
 
 def _resolve_employment_type(employment, schedule):

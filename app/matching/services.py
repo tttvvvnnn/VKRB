@@ -150,6 +150,87 @@ def calculate_ai_score(resume, vacancy):
     return score, explanation, relevant_exp
 
 
+def calculate_ai_score_for_live(resume, vac_dict):
+    """
+    AI scoring for live Труд Всем vacancies.
+    Uses llama-3.1-8b-instant (500k tokens/day free tier) instead of 70b.
+    Same Groq call returns score + skills — no extra API calls.
+    """
+    api_key = os.environ.get('GROQ_API_KEY', '').strip()
+    if not api_key:
+        return None, '', None, []
+
+    from groq import Groq
+    from vacancies.trudvsem_import import _clean_skill, enrich_vac_dict
+
+    d = enrich_vac_dict(vac_dict)
+    title = (d.get('job-name') or '').strip()
+    duty = (d.get('duty') or '').strip()
+    requirements = (d.get('requirements') or '').strip()
+    benefit = (d.get('benefit') or '').strip()
+    raw_skills = d.get('skills') or []
+    api_skills = ', '.join(
+        {_clean_skill(s) for s in raw_skills if s and _clean_skill(s)}
+    ) or ''
+    req = d.get('requirement') or {}
+
+    # Build vacancy context — pass full text split across sections
+    vac_lines = [f"Должность: {title}"]
+    if api_skills:
+        vac_lines.append(f"Навыки (из API): {api_skills}")
+    exp_api = float(req.get('experience') or 0)
+    if exp_api:
+        vac_lines.append(f"Требуемый опыт: {exp_api} лет")
+    if duty and requirements and duty != requirements:
+        vac_lines.append(f"Обязанности:\n{duty[:400]}")
+        vac_lines.append(f"Требования:\n{requirements[:500]}")
+    elif requirements:
+        vac_lines.append(f"Текст вакансии:\n{requirements[:800]}")
+    elif duty:
+        vac_lines.append(f"Текст вакансии:\n{duty[:800]}")
+
+    vac_text = '\n\n'.join(vac_lines)
+
+    skills_resume = ', '.join(s.name for s in resume.skill_tags.all()) or 'не указаны'
+
+    user_prompt = f"""Оцени соответствие кандидата вакансии (0-100). Текст вакансии может быть неструктурированным — извлеки требования самостоятельно.
+
+РЕЗЮМЕ: {resume.desired_position} | навыки: {skills_resume} | опыт: {(resume.work_experience or '')[:400]}
+
+ВАКАНСИЯ:
+{vac_text}
+
+JSON: {{"score":<0-100>,"relevant_experience_years":<float>,"explanation":"<1 предложение рус>","required_skills":["навык1",...]}}"""
+
+    client = Groq(api_key=api_key)
+    response = client.chat.completions.create(
+        model='llama-3.1-8b-instant',
+        messages=[
+            {
+                'role': 'system',
+                'content': 'HR-эксперт. Анализируй вакансии и резюме. Отвечай только валидным JSON.',
+            },
+            {'role': 'user', 'content': user_prompt},
+        ],
+        max_tokens=250,
+        temperature=0.1,
+    )
+
+    text = response.choices[0].message.content.strip()
+    # Extract the outermost JSON object (may contain nested arrays)
+    match = re.search(r'\{.*\}', text, re.DOTALL)
+    if not match:
+        return None, '', None, []
+
+    data = json.loads(match.group())
+    score = max(0.0, min(100.0, float(data['score']))) / 100.0
+    relevant_exp = max(0.0, float(data.get('relevant_experience_years', 0)))
+    explanation = data.get('explanation', '')
+    raw_skills = data.get('required_skills') or []
+    ai_skills = [s.strip() for s in raw_skills if isinstance(s, str) and s.strip()]
+    return score, explanation, relevant_exp, ai_skills
+
+
 def _compute_match(resume, vacancy):
     skill_data = calculate_skill_score(resume, vacancy)
     city_score = calculate_city_score(resume, vacancy)
@@ -399,3 +480,182 @@ def rank_resumes_for_vacancy(vacancy, resumes):
         match_data['resume'] = resume
         results.append(match_data)
     return sorted(results, key=lambda x: x['score'], reverse=True)
+
+
+# ── Live (Труд Всем) matching — no DB storage ──────────────────────────────────
+
+class _SkillProxy:
+    def __init__(self, name):
+        self.name = name
+
+
+class _SkillSetProxy:
+    def __init__(self, names):
+        self._items = [_SkillProxy(n) for n in names]
+
+    def all(self):
+        return self._items
+
+
+class _VacancyProxy:
+    """Duck-type Vacancy for matching functions, backed by a raw Труд Всем dict."""
+
+    def __init__(self, vac_dict):
+        from vacancies.trudvsem_import import _clean_skill, enrich_vac_dict
+        d = enrich_vac_dict(vac_dict)
+
+        region = d.get('region') or {}
+        requirement = d.get('requirement') or {}
+
+        self.title = (d.get('job-name') or '').strip()
+        self.company = ((d.get('company') or {}).get('name') or '').strip()
+        self.city = (region.get('name') or '').replace('Город ', '').replace('г. ', '').strip()
+        self.description = (d.get('duty') or '').strip()
+        self.requirements = (d.get('requirements') or '').strip()
+        self.conditions = (d.get('benefit') or '').strip()
+        try:
+            self.required_experience_years = float(requirement.get('experience') or 0)
+        except (TypeError, ValueError):
+            self.required_experience_years = 0.0
+
+        raw_skills = d.get('skills') or []
+        seen, names = set(), []
+        for s in raw_skills:
+            cleaned = _clean_skill(s)
+            if cleaned and cleaned.lower() not in seen:
+                seen.add(cleaned.lower())
+                names.append(cleaned)
+        self._seen_lower: set = seen
+        self.skill_tags = _SkillSetProxy(names)
+
+    def enrich_skills(self, extra_names: list[str]) -> None:
+        """Add skill names returned by the AI into skill_tags (deduplicates)."""
+        added = []
+        for name in extra_names:
+            if name and name.lower() not in self._seen_lower:
+                self._seen_lower.add(name.lower())
+                added.append(name)
+        if added:
+            existing = [s.name for s in self.skill_tags.all()]
+            self.skill_tags = _SkillSetProxy(existing + added)
+
+
+def calculate_match_live(resume, vac_dict):
+    """Full match (with AI if available) against a live Труд Всем dict. No DB caching."""
+    proxy = _VacancyProxy(vac_dict)
+    city_score = calculate_city_score(resume, proxy)
+    required_exp = float(proxy.required_experience_years)
+
+    # ── AI scoring (also extracts required skills) ──────────────────────────
+    ai_score, ai_explanation, relevant_exp_years, ai_skills = None, '', None, []
+    try:
+        ai_score, ai_explanation, relevant_exp_years, ai_skills = calculate_ai_score_for_live(resume, vac_dict)
+    except Exception as e:
+        print(f'[Groq AI Live] Error: {e}', flush=True)
+
+    # ── Enrich proxy skills with AI-extracted list ───────────────────────────
+    if ai_skills:
+        proxy.enrich_skills(ai_skills)
+
+    # ── Skill score (now uses enriched skills) ───────────────────────────────
+    skill_data = calculate_skill_score(resume, proxy)
+
+    if ai_score is not None:
+        exp_score = 1.0 if required_exp <= 0 else min(1.0, relevant_exp_years / required_exp)
+        final_score = (
+            skill_data['score'] * 0.35 +
+            ai_score * 0.35 +
+            exp_score * 0.20 +
+            city_score * 0.10
+        )
+        breakdown = _build_breakdown(
+            skill_score=skill_data['score'],
+            second_score=ai_score,
+            second_label='AI-оценка',
+            experience_score=exp_score,
+            city_score=city_score,
+            weights=(35, 35, 20, 10),
+            experience_note=_experience_note(relevant_exp_years, required_exp),
+        )
+        text_score_percent = round(ai_score * 100, 2)
+        ai_used = True
+        explanation = ai_explanation
+    else:
+        exp_score = calculate_experience_score(resume, proxy)
+        text_score = calculate_text_similarity(resume, proxy)
+        final_score = (
+            skill_data['score'] * 0.40 +
+            text_score * 0.35 +
+            exp_score * 0.20 +
+            city_score * 0.05
+        )
+        explanation = build_explanation(round(final_score * 100, 2), skill_data, text_score, exp_score, city_score)
+        text_score_percent = round(text_score * 100, 2)
+        ai_used = False
+        relevant_exp_years = None
+        breakdown = _build_breakdown(
+            skill_score=skill_data['score'],
+            second_score=text_score,
+            second_label='Текстовое сходство',
+            experience_score=exp_score,
+            city_score=city_score,
+            weights=(40, 35, 20, 5),
+        )
+
+    score_percent = round(final_score * 100, 2)
+    return {
+        'score': final_score,
+        'score_percent': score_percent,
+        'skill_score_percent': round(skill_data['score'] * 100, 2),
+        'text_score_percent': text_score_percent,
+        'experience_score_percent': round(exp_score * 100, 2),
+        'city_score_percent': round(city_score * 100, 2),
+        'matched_skills': skill_data['matched_skills'],
+        'missing_skills': skill_data['missing_skills'],
+        'explanation': explanation,
+        'progress_percent': max(0, min(100, round(score_percent))),
+        'ai_used': ai_used,
+        'ai_score': ai_score,
+        'relevant_experience_years': relevant_exp_years,
+        'breakdown': breakdown,
+    }
+
+
+def calculate_match_quick(resume, vac_dict):
+    """Fast TF-IDF-only match for detail pages (no AI, no DB)."""
+    proxy = _VacancyProxy(vac_dict)
+    skill_data = calculate_skill_score(resume, proxy)
+    city_score = calculate_city_score(resume, proxy)
+    experience_score = calculate_experience_score(resume, proxy)
+    text_score = calculate_text_similarity(resume, proxy)
+
+    final_score = (
+        skill_data['score'] * 0.40 +
+        text_score * 0.35 +
+        experience_score * 0.20 +
+        city_score * 0.05
+    )
+    score_percent = round(final_score * 100, 2)
+    return {
+        'score': final_score,
+        'score_percent': score_percent,
+        'skill_score_percent': round(skill_data['score'] * 100, 2),
+        'text_score_percent': round(text_score * 100, 2),
+        'experience_score_percent': round(experience_score * 100, 2),
+        'city_score_percent': round(city_score * 100, 2),
+        'matched_skills': skill_data['matched_skills'],
+        'missing_skills': skill_data['missing_skills'],
+        'explanation': build_explanation(score_percent, skill_data, text_score, experience_score, city_score),
+        'progress_percent': max(0, min(100, round(score_percent))),
+        'ai_used': False,
+        'ai_score': None,
+        'relevant_experience_years': None,
+        'breakdown': _build_breakdown(
+            skill_score=skill_data['score'],
+            second_score=text_score,
+            second_label='Текстовое сходство',
+            experience_score=experience_score,
+            city_score=city_score,
+            weights=(40, 35, 20, 5),
+        ),
+    }
