@@ -8,6 +8,7 @@ urlpatterns = [
 
     path('resume/<int:pk>/vacancies/', views.match_vacancies_for_resume_view, name='match_vacancies_for_resume'),
     path('resume/<int:pk>/trudvsem/', views.match_trudvsem_view,             name='match_trudvsem'),
+    path('resume/<int:pk>/favorites/', views.match_favorites_view,           name='match_favorites'),
     path('vacancy/<int:pk>/resumes/',  views.match_resumes_for_vacancy_view,  name='match_resumes_for_vacancy'),
 
     path('job/<str:job_id>/poll/',   views.poll_job,   name='match_poll_job'),

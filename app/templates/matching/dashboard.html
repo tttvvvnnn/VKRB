@@ -97,6 +97,48 @@
 
 <div class="row g-4 mt-0">
     <div class="col-12">
+        <div class="card" style="border-radius:12px;border-color:rgba(245,158,11,0.35);">
+            <div class="card-header d-flex align-items-center gap-2">
+                <span style="background:rgba(245,158,11,0.12);border-radius:8px;width:32px;height:32px;display:flex;align-items:center;justify-content:center;">
+                    <i class="bi bi-star-fill" style="color:#fbbf24;"></i>
+                </span>
+                Матчинг по избранным вакансиям
+            </div>
+            <div class="card-body">
+                <p class="text-muted mb-3" style="font-size:0.85rem;">
+                    Добавляйте вакансии (из базы или с Труд Всем) в избранное, затем запускайте матчинг только по ним.
+                </p>
+                {% if my_resumes %}
+                <div class="list-group" style="gap:0;">
+                    {% for resume in my_resumes %}
+                    <a href="{% url 'match_favorites' resume.pk %}"
+                       class="list-group-item list-group-item-action d-flex align-items-center justify-content-between">
+                        <div>
+                            <div class="fw-600" style="font-size:0.875rem;">{{ resume.title }}</div>
+                            <div class="text-muted" style="font-size:0.78rem;">
+                                {{ resume.desired_position }} · {{ resume.get_search_status_display }}
+                            </div>
+                        </div>
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="badge" style="background:rgba(245,158,11,0.2);color:#fbbf24;font-size:0.7rem;">Избранное</span>
+                            <i class="bi bi-chevron-right text-muted" style="font-size:0.75rem;"></i>
+                        </div>
+                    </a>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="alert alert-secondary mb-0">
+                    <i class="bi bi-plus-circle me-2"></i>
+                    <a href="{% url 'resume_create' %}" style="color:inherit;">Создайте резюме</a>, чтобы начать.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4 mt-0">
+    <div class="col-12">
         <div class="card" style="border-radius:12px;border-color:rgba(99,102,241,0.3);">
             <div class="card-header d-flex align-items-center gap-2">
                 <span style="background:rgba(99,102,241,0.15);border-radius:8px;width:32px;height:32px;display:flex;align-items:center;justify-content:center;">

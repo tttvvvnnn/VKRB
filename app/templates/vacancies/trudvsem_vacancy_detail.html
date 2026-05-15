@@ -26,12 +26,40 @@
         <i class="bi bi-box-arrow-up-right me-1"></i>На Труд Всем
     </a>
     {% endif %}
+    {% if vac_id %}
+    <button id="btn-fav" class="btn btn-sm {% if is_favorited %}btn-warning{% else %}btn-outline-warning{% endif %}"
+            onclick="toggleFav()" title="В избранное">
+        <i class="bi bi-star{% if is_favorited %}-fill{% endif %}"></i>
+    </button>
+    {% endif %}
 </div>
 
 {% if error %}
 <div class="alert alert-danger">
     <i class="bi bi-exclamation-triangle me-2"></i>
     Не удалось загрузить вакансию: {{ error }}
+</div>
+{% endif %}
+
+{% if vacancy and user_resumes %}
+<div class="card mb-4" style="border-radius:12px;border:1px solid var(--accent);">
+    <div class="card-body">
+        <div class="d-flex align-items-center gap-3 flex-wrap">
+            <div class="flex-grow-1">
+                <p class="fw-600 mb-1"><i class="bi bi-stars me-1" style="color:var(--accent);"></i>AI-оценка соответствия</p>
+                <p class="text-muted mb-0" style="font-size:0.82rem;">Выберите резюме и получите оценку от Groq AI</p>
+            </div>
+            <select id="ai-resume-select" class="form-select form-select-sm" style="width:auto;min-width:180px;">
+                {% for r in user_resumes %}
+                <option value="{{ r.pk }}">{{ r.title }}</option>
+                {% endfor %}
+            </select>
+            <button class="btn btn-sm btn-primary" onclick="requestAiScore()" id="btn-ai-score">
+                <i class="bi bi-cpu me-1"></i>Оценить
+            </button>
+        </div>
+        <div id="ai-score-result" class="mt-3" style="display:none;"></div>
+    </div>
 </div>
 {% endif %}
 
@@ -207,5 +235,67 @@
         {% endif %}
     </div>
 </div>
+{% endif %}
+
+{% if vac_id %}
+<script>
+const FAV_URL = "{% url 'toggle_favorite_trudvsem' vac_id=vac_id %}";
+const AI_URL  = "{% url 'ai_score_trudvsem' vac_id=vac_id %}";
+const CSRF    = "{{ csrf_token }}";
+
+function toggleFav() {
+    const btn = document.getElementById('btn-fav');
+    fetch(FAV_URL, {method:'POST', headers:{'X-CSRFToken':CSRF}})
+        .then(r => r.json())
+        .then(data => {
+            btn.classList.toggle('btn-warning', data.favorited);
+            btn.classList.toggle('btn-outline-warning', !data.favorited);
+            btn.querySelector('i').className = data.favorited ? 'bi bi-star-fill' : 'bi bi-star';
+        });
+}
+
+function requestAiScore() {
+    const btn = document.getElementById('btn-ai-score');
+    const resumeId = document.getElementById('ai-resume-select').value;
+    const result = document.getElementById('ai-score-result');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>Оцениваю...';
+    result.style.display = 'none';
+    const fd = new FormData();
+    fd.append('resume_id', resumeId);
+    fd.append('csrfmiddlewaretoken', CSRF);
+    fetch(AI_URL, {method:'POST', body:fd})
+        .then(r => r.json())
+        .then(data => {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-cpu me-1"></i>Оценить';
+            result.style.display = 'block';
+            if (data.error) {
+                result.innerHTML = `<div class="alert alert-danger mb-0">${data.error}</div>`;
+            } else {
+                const pct = data.score_percent;
+                const color = pct >= 70 ? 'var(--success)' : pct >= 40 ? 'var(--warning)' : 'var(--danger)';
+                result.innerHTML = `
+                <div class="d-flex align-items-center gap-3">
+                    <div style="width:56px;height:56px;border-radius:50%;border:3px solid ${color};color:${color};
+                        display:flex;flex-direction:column;align-items:center;justify-content:center;font-weight:700;flex-shrink:0;">
+                        <span style="font-size:1.1rem;line-height:1;">${pct}</span>
+                        <span style="font-size:0.6rem;">балл</span>
+                    </div>
+                    <div>
+                        <div style="font-size:0.875rem;">${data.explanation || ''}</div>
+                        ${data.relevant_experience_years ? `<div class="text-muted mt-1" style="font-size:0.8rem;">Релевантный опыт: ${data.relevant_experience_years} лет</div>` : ''}
+                    </div>
+                </div>`;
+            }
+        })
+        .catch(() => {
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-cpu me-1"></i>Оценить';
+            result.style.display = 'block';
+            result.innerHTML = '<div class="alert alert-danger mb-0">Ошибка соединения</div>';
+        });
+}
+</script>
 {% endif %}
 {% endblock %}

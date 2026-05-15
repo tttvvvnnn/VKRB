@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.db import models
+from django.db.models import Q
 
 from resumes.models import Resume, Skill
 
@@ -181,3 +182,39 @@ class VacancyApplication(models.Model):
 
     def __str__(self):
         return f'{self.resume.title} → {self.vacancy.title}'
+
+
+class FavoriteVacancy(models.Model):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='favorite_vacancies',
+    )
+    vacancy = models.ForeignKey(
+        Vacancy,
+        on_delete=models.CASCADE,
+        null=True, blank=True,
+        related_name='favorited_by',
+    )
+    trudvsem_uid = models.CharField(max_length=255, blank=True)
+    trudvsem_data = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['user', 'vacancy'],
+                condition=Q(vacancy__isnull=False),
+                name='unique_user_vacancy_favorite',
+            ),
+            models.UniqueConstraint(
+                fields=['user', 'trudvsem_uid'],
+                condition=~Q(trudvsem_uid=''),
+                name='unique_user_trudvsem_favorite',
+            ),
+        ]
+
+    def __str__(self):
+        if self.vacancy:
+            return f'★ {self.user} → {self.vacancy.title}'
+        return f'★ {self.user} → Trudvsem:{self.trudvsem_uid}'

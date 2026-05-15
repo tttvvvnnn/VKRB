@@ -9,7 +9,7 @@ from django.urls import reverse
 
 from accounts.models import Profile
 from resumes.models import Resume
-from vacancies.models import Vacancy
+from vacancies.models import FavoriteVacancy, Vacancy
 from .services import calculate_match, calculate_match_live, rank_vacancies_for_resume, rank_resumes_for_vacancy
 
 # { job_id: { done, error, cancel, total, partial: [...] } }
@@ -80,6 +80,17 @@ def _serialize_vacancy_result(item):
         'missing_skills': item.get('missing_skills', []),
         'breakdown':      item.get('breakdown', []),
     }
+
+
+def _serialize_mixed_result(item):
+    if item.get('source') == 'db' or 'vacancy' in item:
+        base = _serialize_vacancy_result(item)
+        base['source'] = 'db'
+        base['detail_url'] = f"/vacancies/{item['vacancy'].pk}/"
+        return base
+    base = _serialize_live_result(item)
+    base['source'] = 'live'
+    return base
 
 
 def _serialize_resume_result(item):
@@ -203,8 +214,8 @@ def poll_job(request, job_id):
 
     partial = job.get('partial', [])
     mode = request.GET.get('mode', 'vacancy')
-    if mode == 'live':
-        serializer = _serialize_live_result
+    if mode in ('live', 'favorites'):
+        serializer = _serialize_mixed_result
     elif mode == 'resume':
         serializer = _serialize_resume_result
     else:
@@ -510,6 +521,112 @@ def match_trudvsem_view(request, pk):
         return redirect(request.path + f'?job_id={job_id}')
 
     return render(request, 'matching/trudvsem_match.html', _form_ctx())
+
+
+def _run_favorites_job(job_id, resume_pk, db_vacancy_pks, live_items):
+    from django.db import connection
+    partial = []
+    try:
+        resume = Resume.objects.prefetch_related('skill_tags').get(pk=resume_pk)
+        db_vacancies = list(
+            Vacancy.objects.filter(pk__in=db_vacancy_pks).prefetch_related('skill_tags')
+        )
+        for vacancy in db_vacancies:
+            with _jobs_lock:
+                if _jobs.get(job_id, {}).get('cancel'):
+                    break
+            match_data = calculate_match(resume, vacancy)
+            match_data['vacancy'] = vacancy
+            match_data['source'] = 'db'
+            partial.append(match_data)
+            with _jobs_lock:
+                if job_id in _jobs:
+                    _jobs[job_id]['partial'] = sorted(partial, key=lambda x: x['score'], reverse=True)
+
+        from vacancies.trudvsem_import import format_live_item
+        for uid, vac_dict in live_items:
+            with _jobs_lock:
+                if _jobs.get(job_id, {}).get('cancel'):
+                    break
+            match_data = calculate_match_live(resume, vac_dict)
+            match_data['vac_id'] = uid
+            match_data['vac_dict'] = vac_dict
+            fmt = format_live_item(vac_dict)
+            match_data.update({k: fmt[k] for k in ('title', 'company', 'city', 'salary_from', 'salary_to', 'source_url')})
+            match_data['source'] = 'live'
+            partial.append(match_data)
+            with _jobs_lock:
+                if job_id in _jobs:
+                    _jobs[job_id]['partial'] = sorted(partial, key=lambda x: x['score'], reverse=True)
+
+        with _jobs_lock:
+            if job_id in _jobs:
+                _jobs[job_id]['done'] = True
+    except Exception as e:
+        with _jobs_lock:
+            if job_id in _jobs:
+                _jobs[job_id]['error'] = str(e)
+                _jobs[job_id]['done'] = True
+    finally:
+        connection.close()
+
+
+@login_required
+def match_favorites_view(request, pk):
+    resume = get_object_or_404(Resume, pk=pk, owner=request.user)
+    job_id = request.GET.get('job_id', '')
+
+    if job_id:
+        job = _get_job(job_id)
+        if not job:
+            messages.error(request, 'Задача не найдена или истекла.')
+            return redirect(request.path)
+        if job.get('done'):
+            results = job.get('partial', [])
+            _pop_job(job_id)
+            return render(request, 'matching/favorites_results.html', {
+                'resume': resume,
+                'results': results,
+                'error': job.get('error', ''),
+            })
+        return render(request, 'matching/computing.html', {
+            'subject':    resume.title,
+            'total':      job.get('total', 0),
+            'job_id':     job_id,
+            'mode':       'favorites',
+            'cancel_url': reverse('match_cancel_job', args=[job_id]),
+            'poll_url':   reverse('match_poll_job', args=[job_id]) + '?mode=favorites',
+            'done_url':   request.path + f'?job_id={job_id}',
+        })
+
+    favorites = FavoriteVacancy.objects.filter(user=request.user).select_related('vacancy')
+    db_vacancy_pks = [f.vacancy_id for f in favorites if f.vacancy_id]
+    live_items = [(f.trudvsem_uid, f.trudvsem_data) for f in favorites if f.trudvsem_uid and f.trudvsem_data]
+    total = len(db_vacancy_pks) + len(live_items)
+
+    if total == 0:
+        messages.warning(request, 'В избранном нет вакансий. Добавьте их на странице вакансии.')
+        return redirect('matching_dashboard')
+
+    job_id = str(uuid.uuid4())
+    with _jobs_lock:
+        _jobs[job_id] = {'done': False, 'cancel': False, 'error': '', 'partial': [], 'total': total}
+    import threading
+    threading.Thread(
+        target=_run_favorites_job,
+        args=(job_id, resume.pk, db_vacancy_pks, live_items),
+        daemon=True,
+    ).start()
+
+    return render(request, 'matching/computing.html', {
+        'subject':    resume.title,
+        'total':      total,
+        'job_id':     job_id,
+        'mode':       'favorites',
+        'cancel_url': reverse('match_cancel_job', args=[job_id]),
+        'poll_url':   reverse('match_poll_job', args=[job_id]) + '?mode=favorites',
+        'done_url':   request.path + f'?job_id={job_id}',
+    })
 
 
 @login_required

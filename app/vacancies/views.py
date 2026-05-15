@@ -8,7 +8,7 @@ from accounts.decorators import recruiter_required
 from accounts.models import Profile
 from resumes.models import Resume
 from .forms import VacancyApplicationForm, VacancyFilterForm, VacancyForm
-from .models import Vacancy, VacancyApplication
+from .models import FavoriteVacancy, Vacancy, VacancyApplication
 
 
 def get_user_profile(user):
@@ -195,6 +195,8 @@ def vacancy_detail_view(request, pk):
     )
 
     is_owner = vacancy.owner == request.user
+    is_favorited = FavoriteVacancy.objects.filter(user=request.user, vacancy=vacancy).exists()
+    user_resumes = Resume.objects.filter(owner=request.user)
 
     applications = None
     if is_owner:
@@ -203,6 +205,8 @@ def vacancy_detail_view(request, pk):
     return render(request, 'vacancies/vacancy_detail.html', {
         'vacancy': vacancy,
         'is_owner': is_owner,
+        'is_favorited': is_favorited,
+        'user_resumes': user_resumes,
         'applications': applications,
     })
 
@@ -382,11 +386,15 @@ def trudvsem_vacancy_detail_view(request, vac_id):
     elif not error:
         error = 'Вакансия не найдена. Вернитесь в список и откройте её снова.'
 
+    is_favorited = FavoriteVacancy.objects.filter(user=request.user, trudvsem_uid=vac_id).exists()
+    user_resumes = ResumeModel.objects.filter(owner=request.user)
     return render(request, 'vacancies/trudvsem_vacancy_detail.html', {
         'vacancy': vacancy,
         'error': error,
         'vac_id': vac_id,
         'match_results': match_results,
+        'is_favorited': is_favorited,
+        'user_resumes': user_resumes,
     })
 
 
@@ -496,3 +504,87 @@ def application_delete_view(request, pk):
     return render(request, 'vacancies/application_confirm_delete.html', {
         'application': application
     })
+
+
+# ── Favorites ─────────────────────────────────────────────────────────────────
+
+@login_required
+def toggle_favorite_vacancy(request, pk):
+    from django.http import JsonResponse
+    if request.method != 'POST':
+        return JsonResponse({'error': 'method not allowed'}, status=405)
+    vacancy = get_object_or_404(Vacancy, pk=pk)
+    fav = FavoriteVacancy.objects.filter(user=request.user, vacancy=vacancy).first()
+    if fav:
+        fav.delete()
+        return JsonResponse({'favorited': False})
+    FavoriteVacancy.objects.create(user=request.user, vacancy=vacancy)
+    return JsonResponse({'favorited': True})
+
+
+@login_required
+def toggle_favorite_trudvsem(request, vac_id):
+    from django.core.cache import cache
+    from django.http import JsonResponse
+    if request.method != 'POST':
+        return JsonResponse({'error': 'method not allowed'}, status=405)
+    fav = FavoriteVacancy.objects.filter(user=request.user, trudvsem_uid=vac_id).first()
+    if fav:
+        fav.delete()
+        return JsonResponse({'favorited': False})
+    item = cache.get(f'trudvsem_vac_{vac_id}') or {}
+    FavoriteVacancy.objects.create(user=request.user, trudvsem_uid=vac_id, trudvsem_data=item)
+    return JsonResponse({'favorited': True})
+
+
+# ── On-demand AI score ─────────────────────────────────────────────────────────
+
+@login_required
+def ai_score_vacancy(request, pk):
+    from django.http import JsonResponse
+    from matching.services import calculate_ai_score
+    if request.method != 'POST':
+        return JsonResponse({'error': 'method not allowed'}, status=405)
+    vacancy = get_object_or_404(Vacancy, pk=pk)
+    resume_pk = request.POST.get('resume_id')
+    resume = get_object_or_404(Resume, pk=resume_pk, owner=request.user)
+    try:
+        score, explanation, relevant_exp = calculate_ai_score(resume, vacancy)
+        if score is None:
+            return JsonResponse({'error': 'Groq AI недоступен (нет ключа)'}, status=503)
+        return JsonResponse({
+            'score_percent': round(score * 100),
+            'explanation': explanation,
+            'relevant_experience_years': relevant_exp,
+        })
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
+
+
+@login_required
+def ai_score_trudvsem(request, vac_id):
+    from django.core.cache import cache
+    from django.http import JsonResponse
+    from matching.services import calculate_ai_score_for_live
+    if request.method != 'POST':
+        return JsonResponse({'error': 'method not allowed'}, status=405)
+    resume_pk = request.POST.get('resume_id')
+    resume = get_object_or_404(Resume, pk=resume_pk, owner=request.user)
+    vac_dict = cache.get(f'trudvsem_vac_{vac_id}')
+    if not vac_dict:
+        fav = FavoriteVacancy.objects.filter(user=request.user, trudvsem_uid=vac_id).first()
+        if fav and fav.trudvsem_data:
+            vac_dict = fav.trudvsem_data
+    if not vac_dict:
+        return JsonResponse({'error': 'Данные вакансии не найдены, откройте её снова'}, status=404)
+    try:
+        score, explanation, relevant_exp, _ = calculate_ai_score_for_live(resume, vac_dict)
+        if score is None:
+            return JsonResponse({'error': 'Groq AI недоступен (нет ключа)'}, status=503)
+        return JsonResponse({
+            'score_percent': round(score * 100),
+            'explanation': explanation,
+            'relevant_experience_years': relevant_exp,
+        })
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
