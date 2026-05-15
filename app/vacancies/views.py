@@ -374,6 +374,17 @@ def trudvsem_vacancy_detail_view(request, vac_id):
 
     if item:
         vacancy = format_vacancy_detail(item)
+        if vacancy:
+            from matching.services import extract_skills_from_text
+            vacancy_text = ' '.join(filter(None, [
+                vacancy.get('title', ''),
+                vacancy.get('description', ''),
+                vacancy.get('requirements', ''),
+            ]))
+            extracted = extract_skills_from_text(vacancy_text)
+            existing_lower = {s.lower() for s in (vacancy.get('skills') or [])}
+            extra_skills = [s for s in extracted if s.lower() not in existing_lower]
+            vacancy['skills'] = list(vacancy.get('skills') or []) + extra_skills
     elif not error:
         error = 'Вакансия не найдена. Вернитесь в список и откройте её снова.'
 
