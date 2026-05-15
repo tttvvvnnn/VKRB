@@ -551,24 +551,22 @@ def toggle_favorite_trudvsem(request, vac_id):
 @login_required
 def ai_score_vacancy(request, pk):
     from django.http import JsonResponse
-    from matching.services import calculate_ai_score
+    from matching.services import calculate_match
     if request.method != 'POST':
         return JsonResponse({'error': 'method not allowed'}, status=405)
     vacancy = get_object_or_404(Vacancy, pk=pk)
     resume_pk = request.POST.get('resume_id')
     resume = get_object_or_404(Resume, pk=resume_pk, owner=request.user)
     try:
-        from matching.services import calculate_skill_score
-        skill_data = calculate_skill_score(resume, vacancy)
-        score, explanation, relevant_exp = calculate_ai_score(resume, vacancy)
-        if score is None:
+        result = calculate_match(resume, vacancy)
+        if not result.get('ai_used'):
             return JsonResponse({'error': 'Groq AI недоступен (нет ключа)'}, status=503)
         return JsonResponse({
-            'score_percent': round(score * 100),
-            'explanation': explanation,
-            'relevant_experience_years': relevant_exp,
-            'matched_skills': skill_data['matched_skills'],
-            'missing_skills': skill_data['missing_skills'],
+            'score_percent': round(result['score_percent']),
+            'explanation': result['explanation'],
+            'relevant_experience_years': result.get('relevant_experience_years'),
+            'matched_skills': result['matched_skills'],
+            'missing_skills': result['missing_skills'],
         })
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
@@ -578,7 +576,7 @@ def ai_score_vacancy(request, pk):
 def ai_score_trudvsem(request, vac_id):
     from django.core.cache import cache
     from django.http import JsonResponse
-    from matching.services import calculate_ai_score_for_live
+    from matching.services import calculate_match_live
     if request.method != 'POST':
         return JsonResponse({'error': 'method not allowed'}, status=405)
     resume_pk = request.POST.get('resume_id')
@@ -591,17 +589,15 @@ def ai_score_trudvsem(request, vac_id):
     if not vac_dict:
         return JsonResponse({'error': 'Данные вакансии не найдены, откройте её снова'}, status=404)
     try:
-        from matching.services import calculate_match_quick
-        skill_data = calculate_match_quick(resume, vac_dict)
-        score, explanation, relevant_exp, _ = calculate_ai_score_for_live(resume, vac_dict)
-        if score is None:
+        result = calculate_match_live(resume, vac_dict)
+        if not result.get('ai_used'):
             return JsonResponse({'error': 'Groq AI недоступен (нет ключа)'}, status=503)
         return JsonResponse({
-            'score_percent': round(score * 100),
-            'explanation': explanation,
-            'relevant_experience_years': relevant_exp,
-            'matched_skills': skill_data['matched_skills'],
-            'missing_skills': skill_data['missing_skills'],
+            'score_percent': round(result['score_percent']),
+            'explanation': result['explanation'],
+            'relevant_experience_years': result.get('relevant_experience_years'),
+            'matched_skills': result['matched_skills'],
+            'missing_skills': result['missing_skills'],
         })
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
