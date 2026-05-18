@@ -11,6 +11,59 @@ from .forms import VacancyApplicationForm, VacancyFilterForm, VacancyForm
 from .models import FavoriteVacancy, Vacancy, VacancyApplication
 
 
+def _apply_live_filters(results, d):
+    """Post-filter formatted live Trudvsem results based on filter form cleaned_data."""
+    from .trudvsem_import import EMPLOYMENT_RU_TO_TYPE, SCHEDULE_RU_TO_TYPE
+
+    _type_to_ru = {}
+    for ru, t in {**EMPLOYMENT_RU_TO_TYPE, **SCHEDULE_RU_TO_TYPE}.items():
+        _type_to_ru.setdefault(t, set()).add(ru)
+
+    filtered = list(results)
+
+    employment_types = d.get('employment_type')
+    if employment_types:
+        allowed_ru = set()
+        for et in employment_types:
+            allowed_ru |= _type_to_ru.get(et, set())
+        filtered = [v for v in filtered if (v.get('employment') or '').lower() in allowed_ru]
+
+    salary_min = d.get('salary_min')
+    if salary_min:
+        filtered = [v for v in filtered if v.get('salary_from') is not None and v['salary_from'] >= salary_min]
+
+    salary_max = d.get('salary_max')
+    if salary_max:
+        filtered = [v for v in filtered if v.get('salary_from') is not None and v['salary_from'] <= salary_max]
+
+    if d.get('has_salary'):
+        filtered = [v for v in filtered if v.get('salary_from') is not None]
+
+    experience = d.get('experience')
+    if experience == '0':
+        filtered = [v for v in filtered if (v.get('experience') or 0) == 0]
+    elif experience == '1':
+        filtered = [v for v in filtered if (v.get('experience') or 0) <= 1]
+    elif experience == '3':
+        filtered = [v for v in filtered if (v.get('experience') or 0) <= 3]
+    elif experience == '6':
+        filtered = [v for v in filtered if (v.get('experience') or 0) <= 6]
+    elif experience == '6+':
+        filtered = [v for v in filtered if (v.get('experience') or 0) > 6]
+
+    city = d.get('city')
+    if city:
+        city_lower = city.lower()
+        filtered = [v for v in filtered if city_lower in (v.get('city') or '').lower()]
+
+    skill = d.get('skill')
+    if skill:
+        skill_lower = skill.lower()
+        filtered = [v for v in filtered if any(skill_lower in s.lower() for s in (v.get('skills') or []))]
+
+    return filtered
+
+
 def get_user_profile(user):
     profile, _ = Profile.objects.get_or_create(user=user)
     return profile
@@ -122,8 +175,9 @@ def vacancy_list_view(request):
     # ── Live trudvsem results (first 2 pages = 24 results) ───────────────────
     from .trudvsem_import import _vac_uid, city_to_region_code, format_live_item, live_search
 
-    search_query = filter_form.cleaned_data.get('search', '') if filter_form.is_valid() else ''
-    city_text    = filter_form.cleaned_data.get('city', '')    if filter_form.is_valid() else ''
+    live_filters = filter_form.cleaned_data if filter_form.is_valid() else {}
+    search_query = live_filters.get('search', '')
+    city_text    = live_filters.get('city', '')
     region_code  = city_to_region_code(city_text)
 
     from django.core.cache import cache
@@ -139,7 +193,7 @@ def vacancy_list_view(request):
             uid = _vac_uid(raw)
             if uid:
                 cache.set(f'trudvsem_vac_{uid}', raw, 3600)
-        live_results = [format_live_item(i) for i in raw_items]
+        live_results = _apply_live_filters([format_live_item(i) for i in raw_items], live_filters)
     except Exception as e:
         live_error = str(e)
 
@@ -410,12 +464,17 @@ def trudvsem_vacancy_detail_view(request, vac_id):
 @login_required
 def trudvsem_load_more(request):
     """AJAX endpoint: returns next page of live trudvsem results as JSON."""
-    from .trudvsem_import import _vac_uid, format_live_item, live_search
+    from .trudvsem_import import _vac_uid, city_to_region_code, format_live_item, live_search
     from django.core.cache import cache
     from django.http import JsonResponse
 
-    search      = request.GET.get('search', '')
-    region_code = request.GET.get('region_code', '') or None
+    filter_form  = VacancyFilterForm(request.GET)
+    live_filters = filter_form.cleaned_data if filter_form.is_valid() else {}
+
+    search      = live_filters.get('search') or ''
+    city_text   = live_filters.get('city') or ''
+    region_code = city_to_region_code(city_text) or request.GET.get('region_code') or None
+
     try:
         offset = max(0, int(request.GET.get('offset', 0)))
     except ValueError:
@@ -427,7 +486,7 @@ def trudvsem_load_more(request):
             uid = _vac_uid(raw)
             if uid:
                 cache.set(f'trudvsem_vac_{uid}', raw, 3600)
-        results = [format_live_item(i) for i in items]
+        results = _apply_live_filters([format_live_item(i) for i in items], live_filters)
         return JsonResponse({'results': results, 'total': total, 'offset': offset, 'count': len(results)})
     except Exception as e:
         return JsonResponse({'error': str(e), 'results': [], 'total': 0}, status=500)
@@ -567,6 +626,7 @@ def ai_score_vacancy(request, pk):
             'relevant_experience_years': result.get('relevant_experience_years'),
             'matched_skills': result['matched_skills'],
             'missing_skills': result['missing_skills'],
+            'breakdown': result.get('breakdown', []),
         })
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
@@ -598,6 +658,7 @@ def ai_score_trudvsem(request, vac_id):
             'relevant_experience_years': result.get('relevant_experience_years'),
             'matched_skills': result['matched_skills'],
             'missing_skills': result['missing_skills'],
+            'breakdown': result.get('breakdown', []),
         })
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)

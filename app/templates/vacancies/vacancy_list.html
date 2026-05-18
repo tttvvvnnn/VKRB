@@ -130,7 +130,7 @@
 
                     <!-- Зарплата -->
                     <div class="filter-section">
-                        <span class="filter-label"><i class="bi bi-currency-dollar me-1"></i>Зарплата (₽)</span>
+                        <span class="filter-label"><i class="bi bi-currency-ruble me-1"></i>Зарплата (₽)</span>
                         <div class="d-flex gap-2 align-items-center">
                             {{ filter_form.salary_min }}
                             <span class="text-muted" style="font-size:0.8rem;">—</span>
@@ -261,7 +261,7 @@
                                 {% if v.experience %}<span><i class="bi bi-briefcase me-1"></i>{{ v.experience }} лет</span>{% endif %}
                                 {% if v.salary_from or v.salary_to %}
                                 <span style="color:var(--success);">
-                                    <i class="bi bi-currency-dollar me-1"></i>
+                                    <i class="bi bi-currency-ruble me-1"></i>
                                     {% if v.salary_from %}от {{ v.salary_from }}{% endif %}
                                     {% if v.salary_to %} до {{ v.salary_to }}{% endif %}
                                 </span>
@@ -312,8 +312,7 @@
                 <button id="btn-load-more"
                         class="btn btn-outline-primary"
                         data-offset="{{ live_loaded }}"
-                        data-search="{{ live_search }}"
-                        data-region="{{ live_region }}"
+                        data-filter="{{ filter_query }}"
                         data-url="{% url 'trudvsem_load_more' %}"
                         data-detail-base="/vacancies/trudvsem/">
                     <i class="bi bi-arrow-down-circle me-1"></i>
@@ -362,14 +361,14 @@ document.querySelectorAll('.direction-tag[data-city]').forEach(function(tag) {
 
     btn.addEventListener('click', function () {
         const offset     = parseInt(btn.dataset.offset);
-        const search     = btn.dataset.search;
-        const region     = btn.dataset.region;
+        const filterStr  = btn.dataset.filter || '';
         const url        = btn.dataset.url;
 
         btn.disabled = true;
         btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Загружаем…';
 
-        const params = new URLSearchParams({ offset, search, region_code: region });
+        const params = new URLSearchParams(filterStr);
+        params.set('offset', offset);
         fetch(url + '?' + params)
             .then(r => r.json())
             .then(data => {
@@ -381,7 +380,7 @@ document.querySelectorAll('.direction-tag[data-city]').forEach(function(tag) {
 
                 data.results.forEach(function (v) {
                     const salary = (v.salary_from || v.salary_to)
-                        ? `<span style="color:var(--success);"><i class="bi bi-currency-dollar me-1"></i>${v.salary_from ? 'от ' + v.salary_from : ''}${v.salary_to ? ' до ' + v.salary_to : ''}</span>`
+                        ? `<span style="color:var(--success);"><i class="bi bi-currency-ruble me-1"></i>${v.salary_from ? 'от ' + v.salary_from : ''}${v.salary_to ? ' до ' + v.salary_to : ''}</span>`
                         : '';
                     const skills = (v.skills || []).map(s =>
                         `<span class="badge bg-secondary me-1 mb-1">${s}</span>`).join('');

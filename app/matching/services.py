@@ -648,7 +648,15 @@ class _VacancyProxy:
 
 
 def calculate_match_live(resume, vac_dict):
-    """Full match (with AI if available) against a live Труд Всем dict. No DB caching."""
+    """Full match (with AI if available) against a live Труд Всем dict. Cached in Django cache."""
+    from django.core.cache import cache
+    from vacancies.trudvsem_import import _vac_uid
+    uid = _vac_uid(vac_dict)
+    if uid:
+        cached = cache.get(f'match_live_{resume.pk}_{uid}')
+        if cached:
+            return cached
+
     proxy = _VacancyProxy(vac_dict)
     city_score = calculate_city_score(resume, proxy)
     required_exp = float(proxy.required_experience_years)
@@ -713,7 +721,7 @@ def calculate_match_live(resume, vac_dict):
         )
 
     score_percent = round(final_score * 100, 2)
-    return {
+    result = {
         'score': final_score,
         'score_percent': score_percent,
         'skill_score_percent': round(skill_data['score'] * 100, 2),
@@ -729,6 +737,10 @@ def calculate_match_live(resume, vac_dict):
         'relevant_experience_years': relevant_exp_years,
         'breakdown': breakdown,
     }
+    if uid:
+        from django.core.cache import cache
+        cache.set(f'match_live_{resume.pk}_{uid}', result, 3600)
+    return result
 
 
 def calculate_match_quick(resume, vac_dict):

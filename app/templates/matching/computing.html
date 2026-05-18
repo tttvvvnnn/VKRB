@@ -150,7 +150,7 @@
         const detailUrl = r.detail_url || '/vacancies/' + r.pk + '/';
         const salary = (r.salary_from || r.salary_to)
             ? `<span style="color:var(--success);font-size:0.8rem;">
-                <i class="bi bi-currency-dollar"></i>
+                <i class="bi bi-currency-ruble"></i>
                 ${r.salary_from ? 'от ' + r.salary_from : ''}
                 ${r.salary_to   ? ' до ' + r.salary_to  : ''}
                </span>`

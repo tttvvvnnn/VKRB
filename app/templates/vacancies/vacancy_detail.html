@@ -82,7 +82,7 @@
                     {% if vacancy.salary_from or vacancy.salary_to %}
                     <hr class="my-1">
                     <div class="d-flex justify-content-between">
-                        <span class="text-muted"><i class="bi bi-currency-dollar me-1"></i>Зарплата</span>
+                        <span class="text-muted"><i class="bi bi-currency-ruble me-1"></i>Зарплата</span>
                         <span style="color:var(--success);">
                             {% if vacancy.salary_from %}от {{ vacancy.salary_from }}{% endif %}
                             {% if vacancy.salary_to %} до {{ vacancy.salary_to }}{% endif %}
@@ -218,6 +218,36 @@ function toggleFav() {
         });
 }
 
+function renderBreakdown(breakdown) {
+    if (!breakdown || !breakdown.length) return '';
+    const rows = breakdown.map(row => `
+        <tr>
+            <td>${row.label}${row.note ? `<br><small class="text-muted">${row.note}</small>` : ''}</td>
+            <td class="text-end">${row.score_percent}%</td>
+            <td class="text-end">${row.weight}%</td>
+            <td class="text-end fw-bold">${row.contribution} б.</td>
+        </tr>`).join('');
+    const total = breakdown.reduce((s, r) => s + r.contribution, 0).toFixed(1);
+    return `
+    <div class="collapse mt-2" id="bd-inline">
+        <table class="table table-sm table-bordered mb-0" style="font-size:0.82rem;">
+            <thead class="table-light">
+                <tr>
+                    <th>Компонент</th>
+                    <th class="text-end" style="width:80px;">Оценка</th>
+                    <th class="text-end" style="width:60px;">Вес</th>
+                    <th class="text-end" style="width:80px;">Вклад</th>
+                </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+            <tfoot class="table-light">
+                <tr><td colspan="3" class="fw-bold">Итого</td>
+                <td class="text-end fw-bold">${total} б.</td></tr>
+            </tfoot>
+        </table>
+    </div>`;
+}
+
 function requestAiScore() {
     const btn = document.getElementById('btn-ai-score');
     const resumeId = document.getElementById('ai-resume-select').value;
@@ -243,6 +273,7 @@ function requestAiScore() {
                     ...(data.matched_skills||[]).map(s=>`<span class="badge bg-success" style="font-size:0.7rem;">${s}</span>`),
                     ...(data.missing_skills||[]).map(s=>`<span class="badge bg-secondary" style="font-size:0.7rem;">${s}</span>`),
                 ].join('');
+                const bdHtml = renderBreakdown(data.breakdown);
                 result.innerHTML = `
                 <div class="d-flex align-items-start gap-3">
                     <div style="width:56px;height:56px;border-radius:50%;border:3px solid ${color};color:${color};
@@ -250,10 +281,11 @@ function requestAiScore() {
                         <span style="font-size:1.1rem;line-height:1;">${pct}</span>
                         <span style="font-size:0.6rem;">балл</span>
                     </div>
-                    <div>
+                    <div class="flex-grow-1">
                         ${skills ? `<div class="d-flex flex-wrap gap-1 mb-2">${skills}</div>` : ''}
                         <div style="font-size:0.875rem;font-style:italic;">${data.explanation || ''}</div>
                         ${data.relevant_experience_years ? `<div class="text-muted mt-1" style="font-size:0.8rem;">Релевантный опыт: ${data.relevant_experience_years} лет</div>` : ''}
+                        ${bdHtml ? `<div class="mt-2"><button class="btn btn-sm btn-outline-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#bd-inline"><i class="bi bi-bar-chart me-1"></i>Разбивка оценки</button></div>${bdHtml}` : ''}
                     </div>
                 </div>`;
             }
