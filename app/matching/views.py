@@ -140,6 +140,43 @@ def _run_resumes_job(job_id, vacancy, resumes):
         connection.close()
 
 
+def _run_vacancies_for_resume_job(job_id, resume_pk, vacancy_pks):
+    from django.db import connection
+    partial = []
+    try:
+        resume = Resume.objects.prefetch_related('skill_tags').get(pk=resume_pk)
+        vacancies = list(
+            Vacancy.objects.filter(pk__in=vacancy_pks).prefetch_related('skill_tags')
+        )
+        for vacancy in vacancies:
+            with _jobs_lock:
+                if _jobs.get(job_id, {}).get('cancel'):
+                    break
+            match_data = calculate_match(resume, vacancy)
+            match_data['vacancy'] = vacancy
+            match_data['source'] = 'db'
+            match_data['title'] = vacancy.title
+            match_data['company'] = vacancy.company
+            match_data['city'] = vacancy.city or ''
+            match_data['salary_from'] = vacancy.salary_from
+            match_data['salary_to'] = vacancy.salary_to
+            match_data['detail_url'] = f'/vacancies/{vacancy.pk}/'
+            partial.append(match_data)
+            with _jobs_lock:
+                if job_id in _jobs:
+                    _jobs[job_id]['partial'] = sorted(partial, key=lambda x: x['score'], reverse=True)
+        with _jobs_lock:
+            if job_id in _jobs:
+                _jobs[job_id]['done'] = True
+    except Exception as e:
+        with _jobs_lock:
+            if job_id in _jobs:
+                _jobs[job_id]['error'] = str(e)
+                _jobs[job_id]['done'] = True
+    finally:
+        connection.close()
+
+
 def _start_job(job_id, target, *args):
     with _jobs_lock:
         _jobs[job_id] = {'done': False, 'cancel': False, 'error': '', 'partial': [], 'total': args[-1]}
@@ -349,6 +386,61 @@ def match_favorites_view(request, pk):
         'done_url':   request.path + f'?job_id={job_id}',
     })
 
+
+@login_required
+@applicant_required
+def match_vacancies_for_resume_view(request, pk):
+    resume = get_object_or_404(Resume, pk=pk, owner=request.user)
+    job_id = request.GET.get('job_id', '')
+
+    if job_id:
+        job = _get_job(job_id)
+        if not job:
+            messages.error(request, 'Задача не найдена или истекла.')
+            return redirect(request.path)
+        if job.get('done'):
+            results = job.get('partial', [])
+            _pop_job(job_id)
+            return render(request, 'matching/vacancies_for_resume.html', {
+                'resume': resume,
+                'results': results,
+                'error': job.get('error', ''),
+            })
+        return render(request, 'matching/computing.html', {
+            'subject':    resume.title,
+            'total':      job.get('total', 0),
+            'job_id':     job_id,
+            'mode':       'favorites',
+            'cancel_url': reverse('match_cancel_job', args=[job_id]),
+            'poll_url':   reverse('match_poll_job', args=[job_id]) + '?mode=favorites',
+            'done_url':   request.path + f'?job_id={job_id}',
+        })
+
+    vacancies = list(
+        Vacancy.objects.filter(
+            visibility=Vacancy.Visibility.PUBLIC,
+            source_url='',
+        ).prefetch_related('skill_tags')
+    )
+    total = len(vacancies)
+
+    if total == 0:
+        messages.warning(request, 'В базе пока нет публичных вакансий для сопоставления.')
+        return redirect('matching_dashboard')
+
+    vacancy_pks = [v.pk for v in vacancies]
+    job_id = str(uuid.uuid4())
+    _start_job(job_id, _run_vacancies_for_resume_job, resume.pk, vacancy_pks, total)
+
+    return render(request, 'matching/computing.html', {
+        'subject':    resume.title,
+        'total':      total,
+        'job_id':     job_id,
+        'mode':       'favorites',
+        'cancel_url': reverse('match_cancel_job', args=[job_id]),
+        'poll_url':   reverse('match_poll_job', args=[job_id]) + '?mode=favorites',
+        'done_url':   request.path + f'?job_id={job_id}',
+    })
 
 @login_required
 def match_resumes_for_vacancy_api(request, pk):

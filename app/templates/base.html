@@ -295,12 +295,14 @@
                     </a>
                 </li>
                 {% endif %}
+                {% if is_recruiter %}
                 <li class="nav-item">
                     <a class="nav-link {% if request.resolver_match.url_name == 'resume_browse' %}active-nav{% endif %}"
                        href="{% url 'resume_browse' %}">
                         <i class="bi bi-people"></i> Все резюме
                     </a>
                 </li>
+                {% endif %}
                 <li class="nav-item">
                     <a class="nav-link {% if request.resolver_match.url_name == 'vacancy_list' %}active-nav{% endif %}"
                        href="{% url 'vacancy_list' %}">
