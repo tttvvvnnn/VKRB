@@ -4,8 +4,15 @@ from django.db.models import Q
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 
+from accounts.decorators import applicant_required
+from accounts.models import Profile
 from .forms import ResumeFilterForm, ResumeForm
 from .models import Resume
+
+
+def _is_recruiter(user):
+    profile, _ = Profile.objects.get_or_create(user=user)
+    return profile.role == Profile.Role.RECRUITER
 
 
 def user_can_view_resume(user, resume):
@@ -28,7 +35,8 @@ def resume_list_view(request):
     resumes = Resume.objects.filter(owner=request.user).prefetch_related('skill_tags')
 
     return render(request, 'resumes/resume_list.html', {
-        'resumes': resumes
+        'resumes': resumes,
+        'is_recruiter': _is_recruiter(request.user),
     })
 
 
@@ -71,6 +79,7 @@ def resume_browse_view(request):
 
 
 @login_required
+@applicant_required
 def resume_create_view(request):
     if request.method == 'POST':
         form = ResumeForm(request.POST)

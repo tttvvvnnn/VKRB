@@ -5,6 +5,7 @@
 {% block content %}
 <h1 class="h3 mb-4">Отклики</h1>
 
+{% if not is_recruiter %}
 <section class="mb-5">
     <h2 class="h4 mb-3">Мои отправленные отклики</h2>
 
@@ -53,6 +54,7 @@
         </div>
     {% endif %}
 </section>
+{% endif %}
 
 {% if is_recruiter %}
     <section>

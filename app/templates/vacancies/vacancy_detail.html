@@ -26,7 +26,7 @@
         {% if is_owner %}
         <a href="{% url 'vacancy_update' vacancy.pk %}" class="btn btn-sm btn-outline-primary">Редактировать</a>
         <a href="{% url 'vacancy_delete' vacancy.pk %}" class="btn btn-sm btn-outline-danger">Удалить</a>
-        {% else %}
+        {% elif not is_recruiter %}
         <a href="{% url 'vacancy_apply' vacancy.pk %}" class="btn btn-sm btn-primary">
             <i class="bi bi-send me-1"></i>Откликнуться
         </a>

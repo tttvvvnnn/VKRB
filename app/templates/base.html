@@ -287,12 +287,14 @@
         <div class="collapse navbar-collapse" id="mainNavbar">
             <ul class="navbar-nav me-auto gap-1 ms-3">
                 {% if user.is_authenticated %}
+                {% if not is_recruiter %}
                 <li class="nav-item">
                     <a class="nav-link {% if request.resolver_match.url_name == 'resume_list' %}active-nav{% endif %}"
                        href="{% url 'resume_list' %}">
                         <i class="bi bi-file-person"></i> Мои резюме
                     </a>
                 </li>
+                {% endif %}
                 <li class="nav-item">
                     <a class="nav-link {% if request.resolver_match.url_name == 'resume_browse' %}active-nav{% endif %}"
                        href="{% url 'resume_browse' %}">

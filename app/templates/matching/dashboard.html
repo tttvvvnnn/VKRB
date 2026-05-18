@@ -57,6 +57,7 @@
     </div>
 </div>
 
+{% if not is_recruiter %}
 <div class="row g-4 mt-0">
     <div class="col-12">
         <div class="card" style="border-radius:12px;border-color:rgba(245,158,11,0.35);">
@@ -98,4 +99,5 @@
         </div>
     </div>
 </div>
+{% endif %}
 {% endblock %}

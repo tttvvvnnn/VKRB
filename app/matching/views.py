@@ -7,6 +7,7 @@ from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 
+from accounts.decorators import applicant_required
 from accounts.models import Profile
 from resumes.models import Resume
 from vacancies.models import FavoriteVacancy, Vacancy
@@ -291,6 +292,7 @@ def _run_favorites_job(job_id, resume_pk, db_vacancy_pks, live_items):
 
 
 @login_required
+@applicant_required
 def match_favorites_view(request, pk):
     resume = get_object_or_404(Resume, pk=pk, owner=request.user)
     job_id = request.GET.get('job_id', '')

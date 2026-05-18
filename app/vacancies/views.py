@@ -4,7 +4,7 @@ from django.core.paginator import Paginator
 from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 
-from accounts.decorators import recruiter_required
+from accounts.decorators import applicant_required, recruiter_required
 from accounts.models import Profile
 from resumes.models import Resume
 from .forms import VacancyApplicationForm, VacancyFilterForm, VacancyForm
@@ -260,6 +260,7 @@ def vacancy_detail_view(request, pk):
         'vacancy': vacancy,
         'is_owner': is_owner,
         'is_favorited': is_favorited,
+        'is_recruiter': user_is_recruiter(request.user),
         'user_resumes': user_resumes,
         'applications': applications,
     })
@@ -305,6 +306,7 @@ def vacancy_delete_view(request, pk):
 
 
 @login_required
+@applicant_required
 def vacancy_apply_view(request, pk):
     vacancy = get_object_or_404(
         Vacancy,
