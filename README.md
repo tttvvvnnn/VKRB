@@ -21,12 +21,12 @@
 
 | Критерий | Вес | Описание |
 |----------|-----|---------|
-| Навыки | 35% | Пересечение тегов навыков |
-| Groq AI | 35% | Семантический анализ (Llama 3.3 70B) |
+| Навыки | 20% | Пересечение тегов навыков |
+| Groq AI / TF-IDF | 50% | Семантический анализ (Llama 3.3 70B) или TF-IDF при отсутствии ключа |
 | Опыт | 20% | Соответствие требуемому стажу |
 | Город | 10% | Совпадение местоположения |
 
-Результаты кэшируются и пересчитываются автоматически при изменении резюме или вакансии. При отсутствии API-ключа система переключается на TF-IDF.
+Результаты кэшируются в `MatchResult` и пересчитываются автоматически при изменении резюме или вакансии. При отсутствии `GROQ_API_KEY` система переключается на TF-IDF cosine similarity.
 
 ## Технологии
 
@@ -35,6 +35,7 @@
 - **ИИ:** Groq API (Llama 3.3 70B), scikit-learn (TF-IDF)
 - **Frontend:** Bootstrap 5, Tom Select
 - **Инфраструктура:** Docker, Docker Compose, Nginx, Gunicorn
+- **Тестирование:** pytest, pytest-django (48 тестов)
 
 ## Быстрый старт
 
@@ -82,6 +83,46 @@ docker compose up --build
 | http://localhost | Основное приложение |
 | http://localhost/admin | Административная панель |
 
+## Тестирование
+
+Проект покрыт **48 тестами**: 41 юнит-тест и 7 интеграционных.
+
+### Запуск всех тестов
+
+```bash
+docker exec django-back bash -c "pytest accounts/tests.py resumes/tests.py vacancies/tests.py matching/tests.py tests_integration.py -v --tb=short"
+```
+
+### Запуск по модулям
+
+```bash
+# Юнит-тесты по модулям
+docker exec django-back bash -c "pytest accounts/tests.py -v --tb=short"
+docker exec django-back bash -c "pytest resumes/tests.py -v --tb=short"
+docker exec django-back bash -c "pytest vacancies/tests.py -v --tb=short"
+docker exec django-back bash -c "pytest matching/tests.py -v --tb=short"
+
+# Интеграционные тесты
+docker exec django-back bash -c "pytest tests_integration.py -v --tb=short"
+```
+
+### Покрытие тестами
+
+| Модуль | Тесты | Что проверяется |
+|--------|-------|----------------|
+| `accounts/tests.py` | 8 | Регистрация, вход, создание Profile, декораторы ролей |
+| `resumes/tests.py` | 9 | CRUD резюме, права доступа, видимость (public/hidden) |
+| `vacancies/tests.py` | 7 | CRUD вакансий, отклики, избранное, уникальность MatchResult |
+| `matching/tests.py` | 17 | Все функции сопоставления, кэш MatchResult, инвалидация |
+| `tests_integration.py` | 7 | Сквозные сценарии: полный цикл соискателя и рекрутера, кэширование, ролевое разграничение |
+
+### Интеграционные сценарии
+
+- **Полный цикл соискателя** — регистрация → резюме → сопоставление (score > 0) → избранное → отклик
+- **Полный цикл рекрутера** — регистрация → вакансия → ранжирование резюме → просмотр откликов → смена статуса (new → viewed → accepted)
+- **Кэширование MatchResult** — кэш-хит при повторном вызове, инвалидация при изменении резюме и вакансии
+- **Ролевое разграничение** — рекрутер заблокирован от действий соискателя, соискатель от рекрутерских, анонимный от всех защищённых URL
+
 ## Демонстрационные аккаунты
 
 | Роль | Email | Пароль |
@@ -114,10 +155,12 @@ docker compose logs web --tail=50
 
 ```
 app/
-├── accounts/       # Пользователи и роли (соискатель / рекрутер)
-├── resumes/        # Резюме и справочник навыков
-├── vacancies/      # Вакансии и отклики
-├── matching/       # Алгоритм сопоставления, кэш результатов
-├── config/         # Настройки Django
-└── templates/      # HTML-шаблоны
+├── accounts/           # Пользователи и роли (соискатель / рекрутер)
+├── resumes/            # Резюме и справочник навыков
+├── vacancies/          # Вакансии и отклики
+├── matching/           # Алгоритм сопоставления, кэш результатов
+├── config/             # Настройки Django
+├── templates/          # HTML-шаблоны
+├── tests_integration.py  # Интеграционные тесты
+└── pytest.ini          # Конфигурация pytest
 ```
