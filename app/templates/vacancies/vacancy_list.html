@@ -232,6 +232,64 @@
         </section>
         {% endif %}
 
+        <!-- Публичные локальные вакансии (из БД) -->
+        {% if only_local %}
+        <section class="mb-5">
+            <p class="section-label"><i class="bi bi-building me-1"></i>Локальные вакансии</p>
+            {% if public_page.object_list %}
+            <div class="row g-3">
+                {% for vacancy in public_page %}
+                <div class="col-md-6">
+                    <div class="card card-hover h-100">
+                        <div class="card-body">
+                            <h3 class="h6 mb-1">
+                                <a href="{% url 'vacancy_detail' vacancy.pk %}" class="text-decoration-none" style="color:var(--text);">{{ vacancy.title }}</a>
+                            </h3>
+                            <p class="text-muted mb-2" style="font-size:0.85rem;">{{ vacancy.company }}</p>
+                            <div class="d-flex gap-3 mb-3" style="font-size:0.8rem;color:var(--text-muted);">
+                                <span><i class="bi bi-geo-alt me-1"></i>{{ vacancy.city|default:"—" }}</span>
+                                <span><i class="bi bi-clock me-1"></i>{{ vacancy.get_employment_type_display }}</span>
+                                <span><i class="bi bi-briefcase me-1"></i>{{ vacancy.required_experience_years }} лет</span>
+                            </div>
+                            <div class="mb-3">
+                                {% for skill in vacancy.skill_tags.all %}
+                                <span class="badge bg-secondary me-1 mb-1">{{ skill.name }}</span>
+                                {% endfor %}
+                            </div>
+                            <a href="{% url 'vacancy_detail' vacancy.pk %}" class="btn btn-sm btn-outline-primary">Подробнее</a>
+                        </div>
+                        <div class="card-footer">
+                            <i class="bi bi-calendar3 me-1"></i>{{ vacancy.created_at|date:"d.m.Y" }}
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% if public_page.has_other_pages %}
+            <nav class="mt-4 d-flex justify-content-center">
+                <ul class="pagination">
+                    {% if public_page.has_previous %}
+                    <li class="page-item"><a class="page-link" href="?{{ filter_query }}&page={{ public_page.previous_page_number }}">‹</a></li>
+                    {% endif %}
+                    {% for n in public_page.paginator.page_range %}
+                    <li class="page-item {% if n == public_page.number %}active{% endif %}">
+                        <a class="page-link" href="?{{ filter_query }}&page={{ n }}">{{ n }}</a>
+                    </li>
+                    {% endfor %}
+                    {% if public_page.has_next %}
+                    <li class="page-item"><a class="page-link" href="?{{ filter_query }}&page={{ public_page.next_page_number }}">›</a></li>
+                    {% endif %}
+                </ul>
+            </nav>
+            {% endif %}
+            {% else %}
+            <div class="alert alert-info">
+                <i class="bi bi-info-circle me-2"></i>Локальных вакансий не найдено.
+            </div>
+            {% endif %}
+        </section>
+        {% endif %}
+
         <!-- Публичные вакансии (live trudvsem) -->
         {% if not only_local %}
         <section>

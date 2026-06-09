@@ -205,6 +205,7 @@ def vacancy_list_view(request):
 
     return render(request, 'vacancies/vacancy_list.html', {
         'my_vacancies': my_vacancies,
+        'public_page':  public_page,
         'is_recruiter': user_is_recruiter(request.user),
         'filter_form': filter_form,
         'filter_query': filter_query,
