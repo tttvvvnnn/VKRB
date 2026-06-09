@@ -156,6 +156,10 @@
                             {{ filter_form.with_source }}
                             <span class="text-muted">Только с Труд Всем</span>
                         </label>
+                        <label class="d-flex align-items-center gap-2 mt-1" style="font-size:0.82rem;cursor:pointer;">
+                            {{ filter_form.only_local }}
+                            <span class="text-muted">Только локальные вакансии</span>
+                        </label>
                     </div>
 
                     <!-- Сортировка -->
@@ -229,6 +233,7 @@
         {% endif %}
 
         <!-- Публичные вакансии (live trudvsem) -->
+        {% if not only_local %}
         <section>
             <div class="d-flex align-items-center justify-content-between mb-2">
                 <p class="section-label mb-0">
@@ -324,6 +329,7 @@
             </div>
             {% endif %}
         </section>
+        {% endif %}
     </div>
 </div>
 {% endblock %}

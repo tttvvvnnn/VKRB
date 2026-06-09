@@ -155,6 +155,10 @@ def vacancy_list_view(request):
             public_vacancies = public_vacancies.exclude(source_url='')
             my_vacancies = my_vacancies.exclude(source_url='')
 
+        if d.get('only_local'):
+            public_vacancies = public_vacancies.filter(source_url='')
+            my_vacancies = my_vacancies.filter(source_url='')
+
         sort_order = d.get('sort_by') or '-created_at'
 
     public_vacancies = public_vacancies.order_by(sort_order)
@@ -176,6 +180,7 @@ def vacancy_list_view(request):
     from .trudvsem_import import _vac_uid, city_to_region_code, format_live_item, live_search
 
     live_filters = filter_form.cleaned_data if filter_form.is_valid() else {}
+    only_local   = live_filters.get('only_local', False)
     search_query = live_filters.get('search', '')
     city_text    = live_filters.get('city', '')
     region_code  = city_to_region_code(city_text)
@@ -185,17 +190,18 @@ def vacancy_list_view(request):
     live_results = []
     live_total   = 0
     live_error   = None
-    try:
-        items1, live_total = live_search(search_query, region_code, offset=0,  per_page=12)
-        items2, _          = live_search(search_query, region_code, offset=12, per_page=12)
-        raw_items = items1 + items2
-        for raw in raw_items:
-            uid = _vac_uid(raw)
-            if uid:
-                cache.set(f'trudvsem_vac_{uid}', raw, 3600)
-        live_results = _apply_live_filters([format_live_item(i) for i in raw_items], live_filters)
-    except Exception as e:
-        live_error = str(e)
+    if not only_local:
+        try:
+            items1, live_total = live_search(search_query, region_code, offset=0,  per_page=12)
+            items2, _          = live_search(search_query, region_code, offset=12, per_page=12)
+            raw_items = items1 + items2
+            for raw in raw_items:
+                uid = _vac_uid(raw)
+                if uid:
+                    cache.set(f'trudvsem_vac_{uid}', raw, 3600)
+            live_results = _apply_live_filters([format_live_item(i) for i in raw_items], live_filters)
+        except Exception as e:
+            live_error = str(e)
 
     return render(request, 'vacancies/vacancy_list.html', {
         'my_vacancies': my_vacancies,
@@ -212,6 +218,7 @@ def vacancy_list_view(request):
         'live_error':   live_error,
         'live_search':  search_query,
         'live_region':  region_code or '',
+        'only_local':   only_local,
     })
 
 

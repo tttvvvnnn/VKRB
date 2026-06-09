@@ -181,6 +181,10 @@ class VacancyFilterForm(forms.Form):
         required=False,
         label='Только с Труд Всем',
     )
+    only_local = forms.BooleanField(
+        required=False,
+        label='Только локальные вакансии',
+    )
     sort_by = forms.ChoiceField(
         required=False,
         label='Сортировка',
