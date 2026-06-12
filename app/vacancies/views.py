@@ -64,6 +64,14 @@ def _apply_live_filters(results, d):
     return filtered
 
 
+def _friendly_live_error(e):
+    """Translate low-level network errors from the Trudvsem API into a Russian message."""
+    err = str(e).lower()
+    if 'timed out' in err or 'timeout' in err:
+        return 'Сервис «Труд Всем» сейчас отвечает слишком медленно. Попробуйте обновить страницу через минуту.'
+    return 'Сервис «Труд Всем» временно недоступен. Попробуйте обновить страницу через минуту.'
+
+
 def get_user_profile(user):
     profile, _ = Profile.objects.get_or_create(user=user)
     return profile
@@ -176,7 +184,7 @@ def vacancy_list_view(request):
         'Медицина', 'Юриспруденция',
     ]
 
-    # ── Live trudvsem results (first 2 pages = 24 results) ───────────────────
+    # ── Live trudvsem results (24 results in one request) ────────────────────
     from .trudvsem_import import _vac_uid, city_to_region_code, format_live_item, live_search
 
     live_filters = filter_form.cleaned_data if filter_form.is_valid() else {}
@@ -192,16 +200,14 @@ def vacancy_list_view(request):
     live_error   = None
     if not only_local:
         try:
-            items1, live_total = live_search(search_query, region_code, offset=0,  per_page=12)
-            items2, _          = live_search(search_query, region_code, offset=12, per_page=12)
-            raw_items = items1 + items2
+            raw_items, live_total = live_search(search_query, region_code, offset=0, per_page=24)
             for raw in raw_items:
                 uid = _vac_uid(raw)
                 if uid:
                     cache.set(f'trudvsem_vac_{uid}', raw, 3600)
             live_results = _apply_live_filters([format_live_item(i) for i in raw_items], live_filters)
         except Exception as e:
-            live_error = str(e)
+            live_error = _friendly_live_error(e)
 
     return render(request, 'vacancies/vacancy_list.html', {
         'my_vacancies': my_vacancies,
@@ -499,7 +505,7 @@ def trudvsem_load_more(request):
         results = _apply_live_filters([format_live_item(i) for i in items], live_filters)
         return JsonResponse({'results': results, 'total': total, 'offset': offset, 'count': len(results)})
     except Exception as e:
-        return JsonResponse({'error': str(e), 'results': [], 'total': 0}, status=500)
+        return JsonResponse({'error': _friendly_live_error(e), 'results': [], 'total': 0}, status=500)
 
 
 @login_required

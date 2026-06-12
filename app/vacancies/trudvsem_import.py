@@ -92,10 +92,22 @@ def _vac_uid(item):
 
 
 def _api_get(path, params=None):
+    from django.core.cache import cache
+
     url = TRUDVSEM_API + path
     if params:
         clean = {k: v for k, v in params.items() if v is not None and v != ''}
         url += '?' + urllib.parse.urlencode(clean)
+
+    # Труд Всем часто отвечает медленно/обрывает соединение — кешируем
+    # успешные ответы на короткое время, чтобы повторные запросы
+    # (перезагрузка страницы, "load more", переход к карточке) не
+    # каждый раз ждали внешний API и не упирались в read timeout.
+    cache_key = 'trudvsem_api_' + hashlib.sha1(url.encode()).hexdigest()
+    cached = cache.get(cache_key)
+    if cached is not None:
+        return cached
+
     req = urllib.request.Request(url, headers=HEADERS)
 
     # trudvsem.ru often drops SSL connections; retry with a permissive context on failure
@@ -108,7 +120,9 @@ def _api_get(path, params=None):
                 ctx.check_hostname = False
                 ctx.verify_mode = ssl.CERT_NONE
             with urllib.request.urlopen(req, timeout=15, context=ctx) as resp:
-                return json.loads(resp.read().decode('utf-8'))
+                data = json.loads(resp.read().decode('utf-8'))
+                cache.set(cache_key, data, 120)
+                return data
         except Exception as exc:
             if attempt == 1:
                 raise
